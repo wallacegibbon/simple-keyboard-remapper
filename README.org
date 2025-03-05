@@ -27,7 +27,7 @@ To stop the service and uninstall the program:
 make uninstall
 #+END_SRC
 
-You may need to change the device name in "simple-keyboard-remapper.service".
+You may need to change the device name in [[file:simple-keyboard-remapper.service::\[Unit\]][the systemd service file]].
 
 
 * Debug
