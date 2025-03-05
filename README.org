@@ -4,3 +4,33 @@ This project is modified/simplified from The [[https://github.com/pietroiusti/ja
 
 Some features are removed to keep the code super simple.
 
+
+* Introduction
+
+This program is based on `uinput'.  We create a new virtual keyboard device
+(with `uinput') and rebuilding the events in this virtual device while blocking
+the original keyboard events.
+
+
+* Installation
+
+This will build, install, enable and start the service.
+
+#+BEGIN_SRC shell
+make install
+#+END_SRC
+
+To stop the service and uninstall the program:
+
+#+BEGIN_SRC shell
+make uninstall
+#+END_SRC
+
+
+* Debug
+
+You can read the log of the service with this command:
+
+#+BEGIN_SRC shell
+sudo journalctl -u simple-keyboard-remapper -f
+#+END_SRC
