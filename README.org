@@ -2,14 +2,15 @@
 
 This project is modified/simplified from The [[https://github.com/pietroiusti/janus-key][Janus Key]] project.
 
-Some features are removed to keep the code super simple.
+Some features (which are unnecessary for a Emacs users) are removed to keep the
+code super simple.
 
 
 * Introduction
 
-This program is based on `uinput'.  We create a new virtual keyboard device
-(with `uinput') and rebuilding the events in this virtual device while blocking
-the original keyboard events.
+This program will create a new virtual keyboard device (with `uinput') and
+rebuilding the events in this virtual device while blocking the original
+keyboard events.
 
 
 * Installation
@@ -25,6 +26,8 @@ To stop the service and uninstall the program:
 #+BEGIN_SRC shell
 make uninstall
 #+END_SRC
+
+You may need to change the device name in "simple-keyboard-remapper.service".
 
 
 * Debug
