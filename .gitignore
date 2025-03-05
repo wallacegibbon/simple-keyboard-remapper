@@ -1,0 +1,5 @@
+simple-keyboard-remapper
+*.swp
+*~
+compile_commands.json
+.cache

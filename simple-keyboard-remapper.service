@@ -1,0 +1,11 @@
+[Unit]
+Description=Simple Keyboard Remapper
+After=syslog.target
+
+[Service]
+Type=simple
+ExecStart=/usr/local/bin/simple-keyboard-remapper /dev/input/event0
+Restart=always
+
+[Install]
+WantedBy=multi-user.target

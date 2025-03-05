@@ -1,0 +1,6 @@
+#+TITLE: Simple Keyboard Remapper
+
+This project is modified/simplified from The [[https://github.com/pietroiusti/janus-key][Janus Key]] project.
+
+Some features are removed to keep the code super simple.
+
