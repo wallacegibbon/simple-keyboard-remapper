@@ -34,7 +34,7 @@ mod_key mod_map[] =
   };
 
 static inline int
-mod_key_pri_or_key (mod_key *self)
+mod_key_primary_or_key (mod_key *self)
 {
   return self->primary_function ? self->primary_function : self->key;
 }
@@ -85,7 +85,7 @@ send_2nd_fun_once (struct libevdev_uinput *uidev, mod_key *k, int value)
 }
 
 static void
-send_2nd_fun_all_active (struct libevdev_uinput *uidev)
+active_mod_keys_send_1_once (struct libevdev_uinput *uidev)
 {
   for (size_t i = 0; i < COUNTOF (mod_map); i++)
     {
@@ -96,24 +96,13 @@ send_2nd_fun_all_active (struct libevdev_uinput *uidev)
 }
 
 static inline void
-send_pri_fun_mod (struct libevdev_uinput *uidev, mod_key *k, int value)
+send_primary_fun (struct libevdev_uinput *uidev, mod_key *k, int value)
 {
-  send_key_ev_and_sync (uidev, mod_key_pri_or_key (k), value);
+  send_key_ev_and_sync (uidev, mod_key_primary_or_key (k), value);
 }
 
 static void
-send_pri_fun_code (struct libevdev_uinput *uidev, long code, int value)
-{
-  int i = mod_map_find (code);
-  if (i >= 0)
-    send_pri_fun_mod (uidev, &mod_map[i], value);
-  else
-    send_key_ev_and_sync (uidev, code, value);
-}
-
-static void
-handle_ev_key_with_2nd_fun (struct libevdev_uinput *uidev, long code,
-			    int value, mod_key *k)
+handle_ev_mod_key_with_2nd_fun (struct libevdev_uinput *uidev, int value, mod_key *k)
 {
   if (value == 0)
     {
@@ -124,9 +113,9 @@ handle_ev_key_with_2nd_fun (struct libevdev_uinput *uidev, long code,
 	}
       else
 	{
-	  send_2nd_fun_all_active (uidev);
-	  send_pri_fun_mod (uidev, k, 1);
-	  send_pri_fun_mod (uidev, k, 0);
+	  active_mod_keys_send_1_once (uidev);
+	  send_primary_fun (uidev, k, 1);
+	  send_primary_fun (uidev, k, 0);
 	}
     }
   else if (value == 1)
@@ -140,31 +129,37 @@ handle_ev_key_with_2nd_fun (struct libevdev_uinput *uidev, long code,
 }
 
 static void
-handle_ev_key_no_2nd_fun (struct libevdev_uinput *uidev, long code, int value)
+handle_ev_mod_key_no_2nd_fun (struct libevdev_uinput *uidev, int value, mod_key *k)
 {
-  if (value == 0)
-    {
-      send_pri_fun_code (uidev, code, 0);
-    }
-  else if (value == 1)
-    {
-      send_2nd_fun_all_active (uidev);
-      send_pri_fun_code (uidev, code, 1);
-    }
-  else
-    {
-      /// Ignore
-    }
+  if (value == 1)
+    active_mod_keys_send_1_once (uidev);
+
+  send_primary_fun (uidev, k, value);
+}
+
+static void
+handle_ev_normal_key (struct libevdev_uinput *uidev, int value, long code)
+{
+  if (value == 1)
+    active_mod_keys_send_1_once (uidev);
+
+  send_key_ev_and_sync (uidev, code, value);
 }
 
 static void
 handle_ev_key (struct libevdev_uinput *uidev, long code, int value)
 {
   int i = mod_map_find (code);
-  if (i >= 0 && mod_map[i].secondary_function > 0)
-    handle_ev_key_with_2nd_fun (uidev, code, value, &mod_map[i]);
+  if (i >= 0)
+    {
+      mod_key *k = &mod_map[i];
+      if (k->secondary_function > 0)
+	handle_ev_mod_key_with_2nd_fun (uidev, value, k);
+      else
+	handle_ev_mod_key_no_2nd_fun (uidev, value, k);
+    }
   else
-    handle_ev_key_no_2nd_fun (uidev, code, value);
+    handle_ev_normal_key (uidev, value, code);
 }
 
 /// The official documents of `libevdev' says:
@@ -254,7 +249,7 @@ main (int argc, char **argv)
 
   struct libevdev_uinput *uidev;
 
-  /// IMPORTANT: Creating a new (e.g. /dev/input/event18) input device.
+  /// IMPORTANT: Creating a new input device. (e.g. /dev/input/event18)
   ret = libevdev_uinput_create_from_device (dev, write_fd, &uidev);
   if (ret != 0)
     return ret;
@@ -280,8 +275,6 @@ main (int argc, char **argv)
     }
   while (ret == LIBEVDEV_READ_STATUS_SYNC
 	 || ret == LIBEVDEV_READ_STATUS_SUCCESS || ret == -EAGAIN);
-
-  /// If the program reach here, something is wrong.
 
   if (ret != LIBEVDEV_READ_STATUS_SUCCESS && ret != -EAGAIN)
     log_error ("Failed to handle events: %s\n", strerror (-ret));
