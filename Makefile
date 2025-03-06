@@ -3,7 +3,7 @@ INSTALL_PATH = /usr/local/bin
 all: simple-keyboard-remapper
 
 simple-keyboard-remapper: remapper.c
-	gcc `pkg-config --cflags libevdev` $< `pkg-config --libs libevdev` -o $@
+	gcc -o $@ $< `pkg-config --cflags --libs libevdev`
 
 .PHONY: install clean
 

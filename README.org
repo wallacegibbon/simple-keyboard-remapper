@@ -8,9 +8,8 @@ code super simple.
 
 * Introduction
 
-This program will create a new virtual keyboard device (with `uinput') and
-rebuilding the events in this virtual device while blocking the original
-keyboard events.
+This program will create a new virtual keyboard device with ~uinput~ and rebuild
+the events in this virtual device while blocking the original keyboard events.
 
 
 * Installation
