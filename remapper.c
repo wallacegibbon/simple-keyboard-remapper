@@ -39,7 +39,7 @@ mod_key mod_map[] =
 
 /// If a key is held down for a time greater than max_delay, it will not send
 /// its primary function when released.
-long max_delay = 300;
+long max_delay = 200;
 
 /// Max delay set by user stored as a timespec struct This time will be filled
 /// with `max_delay' defined in config.h
@@ -113,6 +113,15 @@ send_primary_fun (struct libevdev_uinput *uidev, mod_key *k, int value)
   send_key_ev_and_sync (uidev, mod_key_primary_or_key (k), value);
 }
 
+static long
+calc_time_range_to_now (struct timespec *t)
+{
+  struct timespec now, tmp;
+  clock_gettime (CLOCK_MONOTONIC, &now);
+  timespec_sub (&now, t, &tmp);
+  return timespec_to_ms (&tmp);
+}
+
 static void
 handle_ev_mod_key_with_2nd_fun (struct libevdev_uinput *uidev, int value, mod_key *k)
 {
@@ -129,6 +138,8 @@ handle_ev_mod_key_with_2nd_fun (struct libevdev_uinput *uidev, int value, mod_ke
 	  timespec_add (&k->last_time_down, &delay_timespec, &t);
 	  if (timespec_cmp_now (&t) < 0)
 	    {
+	      debug ("Time Range: %ld\n",
+		     calc_time_range_to_now(&k->last_time_down));
 	      active_mod_keys_send_1_once (uidev);
 	      send_primary_fun (uidev, k, 1);
 	      send_primary_fun (uidev, k, 0);
