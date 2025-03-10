@@ -1,3 +1,4 @@
+#include "time_util.h"
 #include <libevdev/libevdev.h>
 #include <libevdev/libevdev-uinput.h>
 #include <poll.h>
@@ -7,6 +8,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
+#include <time.h>
 #include <errno.h>
 
 #define log_error(...) do { fprintf (stderr, __VA_ARGS__); fflush (stderr); } while (0)
@@ -17,13 +19,15 @@
 
 typedef struct
 {
-  /// `key', `primary_function' and `secondary_function' are all key constants or `0'.
+  /// `key', `primary_function' and `secondary_function' are all keys or `0'.
   long key;
   long primary_function;
   long secondary_function;
 
   long value;
   long last_secondary_function_value;
+
+  struct timespec last_time_down;
 }
   mod_key;
 
@@ -32,6 +36,14 @@ mod_key mod_map[] =
     {KEY_SPACE, 0, KEY_LEFTCTRL},
     {KEY_CAPSLOCK, KEY_ESC},
   };
+
+/// If a key is held down for a time greater than max_delay, it will not send
+/// its primary function when released.
+long max_delay = 300;
+
+/// Max delay set by user stored as a timespec struct This time will be filled
+/// with `max_delay' defined in config.h
+struct timespec delay_timespec;
 
 static inline int
 mod_key_primary_or_key (mod_key *self)
@@ -113,14 +125,20 @@ handle_ev_mod_key_with_2nd_fun (struct libevdev_uinput *uidev, int value, mod_ke
 	}
       else
 	{
-	  active_mod_keys_send_1_once (uidev);
-	  send_primary_fun (uidev, k, 1);
-	  send_primary_fun (uidev, k, 0);
+	  struct timespec t;
+	  timespec_add (&k->last_time_down, &delay_timespec, &t);
+	  if (timespec_cmp_now (&t) < 0)
+	    {
+	      active_mod_keys_send_1_once (uidev);
+	      send_primary_fun (uidev, k, 1);
+	      send_primary_fun (uidev, k, 0);
+	    }
 	}
     }
   else if (value == 1)
     {
       k->value = 1;
+      clock_gettime (CLOCK_MONOTONIC, &k->last_time_down);
     }
   else
     {
@@ -217,6 +235,9 @@ main (int argc, char **argv)
       log_error ("Argument Error: Necessary argument is not given.\n");
       exit (1);
     }
+
+  /// Prepare the delay_timespec that will be used in many places.
+  ms_to_timespec (max_delay, &delay_timespec);
 
   debug ("Simple Keyboard Remapper is started.\n");
 

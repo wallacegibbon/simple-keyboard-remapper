@@ -1,5 +1,6 @@
 simple-keyboard-remapper
 *.swp
 *~
+*.o
 compile_commands.json
 .cache
