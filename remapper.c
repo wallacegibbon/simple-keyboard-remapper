@@ -128,6 +128,7 @@ handle_ev_mod_key_with_2nd_fun (struct libevdev_uinput *uidev, int value, mod_ke
   if (value == 0)
     {
       k->value = 0;
+      debug ("Time Range: %ld\n", calc_time_range_to_now(&k->last_time_down));
       if (send_2nd_fun_once (uidev, k, 0))
 	{
 	  /// Worked as secondary function and had been released.  Done.
@@ -138,8 +139,6 @@ handle_ev_mod_key_with_2nd_fun (struct libevdev_uinput *uidev, int value, mod_ke
 	  timespec_add (&k->last_time_down, &delay_timespec, &t);
 	  if (timespec_cmp_now (&t) < 0)
 	    {
-	      debug ("Time Range: %ld\n",
-		     calc_time_range_to_now(&k->last_time_down));
 	      active_mod_keys_send_1_once (uidev);
 	      send_primary_fun (uidev, k, 1);
 	      send_primary_fun (uidev, k, 0);
