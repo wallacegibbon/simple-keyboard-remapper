@@ -162,8 +162,7 @@ static void handle_ev_normal_key(struct libevdev_uinput *uidev,
 	send_key_ev_and_sync(uidev, code, value);
 }
 
-static void handle_ev_key(struct libevdev_uinput *uidev,
-		long code, int value)
+static void handle_ev_key(struct libevdev_uinput *uidev, long code, int value)
 {
 	int i = mod_map_find(code);
 	if (i >= 0) {
