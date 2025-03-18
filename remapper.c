@@ -49,7 +49,7 @@ long max_delay = 200;
  */
 struct timespec delay_timespec;
 
-static inline int mod_key_primary_or_key(struct modkey *self)
+static inline int modkey_primary_or_key(struct modkey *self)
 {
 	return self->primary_function
 		? self->primary_function
@@ -95,7 +95,7 @@ static int send_2nd_fun_once(struct libevdev_uinput *uidev,
 		return 0;
 }
 
-static void active_mod_keys_send_1_once(struct libevdev_uinput *uidev)
+static void active_modkeys_send_1_once(struct libevdev_uinput *uidev)
 {
 	for (size_t i = 0; i < COUNTOF(mod_map); i++) {
 		struct modkey *k = &mod_map[i];
@@ -107,7 +107,7 @@ static void active_mod_keys_send_1_once(struct libevdev_uinput *uidev)
 static inline void send_primary_fun(struct libevdev_uinput *uidev,
 		struct modkey *k, int value)
 {
-	send_key_ev_and_sync(uidev, mod_key_primary_or_key(k), value);
+	send_key_ev_and_sync(uidev, modkey_primary_or_key(k), value);
 }
 
 static long calc_time_range_to_now(struct timespec *t)
@@ -118,7 +118,7 @@ static long calc_time_range_to_now(struct timespec *t)
 	return timespec_to_ms(&tmp);
 }
 
-static void handle_ev_mod_key_with_2nd_fun(struct libevdev_uinput *uidev,
+static void handle_ev_modkey_with_2nd_fun(struct libevdev_uinput *uidev,
 		int value, struct modkey *k)
 {
 	if (value == 0) {
@@ -126,12 +126,12 @@ static void handle_ev_mod_key_with_2nd_fun(struct libevdev_uinput *uidev,
 		debug("Time Range: %ld\n",
 		      calc_time_range_to_now(&k->last_time_down));
 		if (send_2nd_fun_once(uidev, k, 0)) {
-			/// Done
+			/* Done */
 		} else {
 			struct timespec t;
 			timespec_add(&k->last_time_down, &delay_timespec, &t);
 			if (timespec_cmp_now(&t) < 0) {
-				active_mod_keys_send_1_once(uidev);
+				active_modkeys_send_1_once(uidev);
 				send_primary_fun(uidev, k, 1);
 				send_primary_fun(uidev, k, 0);
 			}
@@ -140,15 +140,15 @@ static void handle_ev_mod_key_with_2nd_fun(struct libevdev_uinput *uidev,
 		k->value = 1;
 		clock_gettime(CLOCK_MONOTONIC, &k->last_time_down);
 	} else {
-		/// Ignore
+		/* Ignore */
 	}
 }
 
-static void handle_ev_mod_key_no_2nd_fun(struct libevdev_uinput *uidev,
+static void handle_ev_modkey_no_2nd_fun(struct libevdev_uinput *uidev,
 		int value, struct modkey *k)
 {
 	if (value == 1)
-		active_mod_keys_send_1_once(uidev);
+		active_modkeys_send_1_once(uidev);
 
 	send_primary_fun(uidev, k, value);
 }
@@ -157,7 +157,7 @@ static void handle_ev_normal_key(struct libevdev_uinput *uidev,
 		int value, long code)
 {
 	if (value == 1)
-		active_mod_keys_send_1_once(uidev);
+		active_modkeys_send_1_once(uidev);
 
 	send_key_ev_and_sync(uidev, code, value);
 }
@@ -168,9 +168,9 @@ static void handle_ev_key(struct libevdev_uinput *uidev, long code, int value)
 	if (i >= 0) {
 		struct modkey *k = &mod_map[i];
 		if (k->secondary_function > 0)
-			handle_ev_mod_key_with_2nd_fun(uidev, value, k);
+			handle_ev_modkey_with_2nd_fun(uidev, value, k);
 		else
-			handle_ev_mod_key_no_2nd_fun(uidev, value, k);
+			handle_ev_modkey_no_2nd_fun(uidev, value, k);
 	} else {
 		handle_ev_normal_key(uidev, value, code);
 	}
