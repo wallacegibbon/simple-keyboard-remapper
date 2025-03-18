@@ -1,4 +1,4 @@
-* Simple Keyboard Remapper
+# Simple Keyboard Remapper
 
 This project is modified/simplified from The Janus Key project.
 	<https://github.com/pietroiusti/janus-key>
@@ -7,14 +7,14 @@ Some features (which are unnecessary for a Emacs users) are removed
 to keep the code super simple.
 
 
-** Introduction
+## Introduction
 
 This program will create a new virtual keyboard device with uinput
 and rebuild the events in this virtual device
 while blocking the original keyboard events.
 
 
-** Installation
+## Installation
 
 This will build, install, enable and start the service.
 
@@ -30,7 +30,7 @@ make uninstall
 
 You may need to change the device name in systemd file.
 
-** Debug
+## Debug
 
 You can read the log of the service with this command:
 
