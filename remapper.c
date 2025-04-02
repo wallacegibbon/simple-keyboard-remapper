@@ -84,15 +84,17 @@ static void send_key_ev_and_sync(struct libevdev_uinput *uidev,
 	debug("Sending %ld %d\n", code, value);
 }
 
+/* return 0 on sent */
 static int send_2nd_fun_once(struct libevdev_uinput *uidev,
 		struct modkey *k, int value)
 {
 	if (k->last_secondary_function_value != value) {
 		send_key_ev_and_sync(uidev, k->secondary_function, value);
 		k->last_secondary_function_value = value;
-		return 1;
-	} else
 		return 0;
+	} else {
+		return 1;
+	}
 }
 
 static void active_modkeys_send_1_once(struct libevdev_uinput *uidev)
@@ -110,7 +112,7 @@ static inline void send_primary_fun(struct libevdev_uinput *uidev,
 	send_key_ev_and_sync(uidev, modkey_primary_or_key(k), value);
 }
 
-static long calc_time_range_to_now(struct timespec *t)
+static long duration_to_now(struct timespec *t)
 {
 	struct timespec now, tmp;
 	clock_gettime(CLOCK_MONOTONIC, &now);
@@ -118,23 +120,30 @@ static long calc_time_range_to_now(struct timespec *t)
 	return timespec_to_ms(&tmp);
 }
 
+static void send_primary_on_short_stroke(struct libevdev_uinput *uidev,
+		struct modkey *k)
+{
+	struct timespec t;
+	timespec_add(&k->last_time_down, &delay_timespec, &t);
+
+	/* Just ignore the stroke when it has been held for too long */
+	if (timespec_cmp_now(&t) > 0)
+		return;
+
+	active_modkeys_send_1_once(uidev);
+	send_primary_fun(uidev, k, 1);
+	send_primary_fun(uidev, k, 0);
+}
+
 static void handle_ev_modkey_with_2nd_fun(struct libevdev_uinput *uidev,
 		int value, struct modkey *k)
 {
 	if (value == 0) {
+		debug("Duration: %ld\n", duration_to_now(&k->last_time_down));
 		k->value = 0;
-		debug("Time Range: %ld\n",
-		      calc_time_range_to_now(&k->last_time_down));
 		if (send_2nd_fun_once(uidev, k, 0)) {
-			/* Done */
-		} else {
-			struct timespec t;
-			timespec_add(&k->last_time_down, &delay_timespec, &t);
-			if (timespec_cmp_now(&t) < 0) {
-				active_modkeys_send_1_once(uidev);
-				send_primary_fun(uidev, k, 1);
-				send_primary_fun(uidev, k, 0);
-			}
+			/* 2nd fun NOT sent, it may be a normal stroke */
+			send_primary_on_short_stroke(uidev, k);
 		}
 	} else if (value == 1) {
 		k->value = 1;
@@ -167,10 +176,11 @@ static void handle_ev_key(struct libevdev_uinput *uidev, long code, int value)
 	int i = mod_map_find(code);
 	if (i >= 0) {
 		struct modkey *k = &mod_map[i];
-		if (k->secondary_function > 0)
+		if (k->secondary_function > 0) {
 			handle_ev_modkey_with_2nd_fun(uidev, value, k);
-		else
+		} else {
 			handle_ev_modkey_no_2nd_fun(uidev, value, k);
+		}
 	} else {
 		handle_ev_normal_key(uidev, value, code);
 	}
@@ -287,8 +297,7 @@ int main(int argc, char **argv)
 			ret == LIBEVDEV_READ_STATUS_SUCCESS ||
 			ret == -EAGAIN);
 
-	if (ret != LIBEVDEV_READ_STATUS_SUCCESS &&
-			ret != -EAGAIN)
+	if (ret != LIBEVDEV_READ_STATUS_SUCCESS && ret != -EAGAIN)
 		log_error("Failed to handle events: %s\n", strerror(-ret));
 
 	return 0;
