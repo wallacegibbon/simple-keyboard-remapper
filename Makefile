@@ -2,6 +2,10 @@ INSTALL_PATH = /usr/local/bin
 C_FLAGS := $(shell pkg-config --cflags libevdev)
 LD_FLAGS := $(shell pkg-config --libs libevdev)
 
+ifeq ($(DEBUG), 1)
+	C_FLAGS += -DDEBUG=1
+endif
+
 all: simple-keyboard-remapper
 
 simple-keyboard-remapper: remapper.o time_util.o
@@ -12,7 +16,7 @@ remapper.o: remapper.c time_util.h
 time_util.o: time_util.c time_util.h
 	gcc -c -o $@ $< $(C_FLAGS)
 
-.PHONY: install clean
+.PHONY: install uninstall clean showlog
 
 install: simple-keyboard-remapper
 	cp $< $(INSTALL_PATH)
@@ -27,3 +31,6 @@ uninstall:
 
 clean:
 	rm -f simple-keyboard-remapper *.o
+
+showlog:
+	journalctl -u simple-keyboard-remapper -f

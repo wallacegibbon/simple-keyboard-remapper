@@ -13,11 +13,13 @@
 
 #define log_error(...) do { fprintf (stderr, __VA_ARGS__); \
 		fflush (stderr); } while (0)
-/*
+
+#if (DEBUG == 1)
 #define debug(...) do { printf (__VA_ARGS__); \
 		fflush (stdout); } while (0)
-*/
+#else
 #define debug(...) (void)0
+#endif
 
 #define COUNTOF(x) (sizeof(x) / sizeof(*(x)))
 

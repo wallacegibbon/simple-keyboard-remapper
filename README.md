@@ -3,7 +3,7 @@
 This project is modified/simplified from The Janus Key project.
 	<https://github.com/pietroiusti/janus-key>
 
-Some features (which are unnecessary for a Emacs users) are removed
+Some features (which are unnecessary for a pure Emacs users) are removed
 to keep the code super simple.
 
 
@@ -30,10 +30,22 @@ make uninstall
 
 You may need to change the device name in systemd file.
 
+
 ## Debug
 
-You can read the log of the service with this command:
+Build this project with DEBUG enabled:
+```shell
+make DEBUG=1
+```
+
+After installation, we can read the log with this command:
 
 ```shell
 sudo journalctl -u simple-keyboard-remapper -f
+```
+
+Or: (In the project path)
+
+```shell
+sudo make showlog
 ```
