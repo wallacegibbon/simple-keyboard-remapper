@@ -1,7 +1,7 @@
 #! /bin/sh
 
 first_kbd=$(cat /proc/bus/input/devices \
-	| sed -n 's/.*sysrq kbd \(event[0-9]\+\).*/\1/p' \
+	| sed -n 's/.*sysrq .*kbd .*\(event[0-9]\+\).*/\1/p' \
 	| head -n1)
 
 case $first_kbd in
