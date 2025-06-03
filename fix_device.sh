@@ -7,6 +7,7 @@ first_kbd=$(cat /proc/bus/input/devices \
 case $first_kbd in
 event0)
 	echo "First keyboard is event0, no need to replace."
+	exit 0
 	;;
 event*)
 	echo "Replacing event0 with $first_kbd ..."
@@ -17,6 +18,5 @@ event*)
 	;;
 esac
 
-svc_file=/etc/systemd/system/simple-keyboard-remapper.service
-
-sed -i "s/event0/$first_kbd/" $svc_file
+sed -i "s/event0/$first_kbd/" \
+	/etc/systemd/system/simple-keyboard-remapper.service
