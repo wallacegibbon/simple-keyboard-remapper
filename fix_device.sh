@@ -5,7 +5,11 @@ first_kbd=$(cat /proc/bus/input/devices \
 	| head -n1)
 
 case $first_kbd in
+event0)
+	echo "First keyboard is event0, no need to replace."
+	;;
 event*)
+	echo "Replacing event0 with $first_kbd ..."
 	;;
 *)
 	echo "Keyboard event file not found" >&2
@@ -15,5 +19,4 @@ esac
 
 svc_file=/etc/systemd/system/simple-keyboard-remapper.service
 
-echo "Replacing event0 with $first_kbd ..."
 sed -i "s/event0/$first_kbd/" $svc_file
