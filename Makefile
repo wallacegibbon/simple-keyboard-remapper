@@ -21,6 +21,7 @@ time_util.o: time_util.c time_util.h
 install: simple-keyboard-remapper
 	cp $< $(INSTALL_PATH)
 	cp simple-keyboard-remapper.service /etc/systemd/system/
+	./fix_device.sh
 	systemctl enable simple-keyboard-remapper.service
 	systemctl start simple-keyboard-remapper.service
 

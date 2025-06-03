@@ -13,6 +13,13 @@ This program will create a new virtual keyboard device with uinput
 and rebuild the events in this virtual device
 while blocking the original keyboard events.
 
+To find out the event file that your keyboard is bound to:
+```sh
+cat /proc/bus/input/devices | grep -i keyboard -B1 -A4
+```
+
+The installation process will use the first keyboard that is found.
+
 
 ## Installation
 
