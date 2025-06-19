@@ -1,10 +1,12 @@
 # Simple Keyboard Remapper
 
-This project is modified/simplified from The Janus Key project.
+This project is originally modified/simplified from The Janus Key project:
 	<https://github.com/pietroiusti/janus-key>
 
 Some features (which are unnecessary for a pure Emacs users) are removed
 to keep the code super simple.
+
+And the `libevdev` dependency is removed, we use `uinput` directly.
 
 
 ## Introduction

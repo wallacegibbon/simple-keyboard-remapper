@@ -1,22 +1,13 @@
 #include "time_util.h"
-#include <libevdev/libevdev.h>
-#include <libevdev/libevdev-uinput.h>
-#include <poll.h>
+#include <linux/uinput.h>
 #include <fcntl.h>
-#include <stdarg.h>
 #include <stdio.h>
-#include <stdlib.h>
-#include <string.h>
 #include <unistd.h>
-#include <time.h>
-#include <errno.h>
 
-#define log_error(...) do { fprintf (stderr, __VA_ARGS__); \
-		fflush (stderr); } while (0)
+#define log_error(...) fprintf(stderr, __VA_ARGS__)
 
 #if (DEBUG == 1)
-#define debug(...) do { printf (__VA_ARGS__); \
-		fflush (stdout); } while (0)
+#define debug(...) do { printf(__VA_ARGS__); fflush(stdout); } while (0)
 #else
 #define debug(...) (void)0
 #endif
@@ -29,7 +20,7 @@ struct modkey {
 	long secondary_function;
 
 	long value;
-	long last_secondary_function_value;
+	long last_value;
 
 	struct timespec last_time_down;
 };
@@ -47,7 +38,7 @@ long max_delay = 200;
 
 /*
  * Max delay set by user stored as a timespec struct.
- * It will be filled with `max_delay' defined in config.h
+ * It will be filled with `max_delay'.
  */
 struct timespec delay_timespec;
 
@@ -67,51 +58,57 @@ static int mod_map_find(long key)
 	return -1;
 };
 
-static void send_key_ev_and_sync(struct libevdev_uinput *uidev,
-		long code, int value)
+static int send_key(int fd, int key, int value)
 {
-	int err;
-	err = libevdev_uinput_write_event(uidev, EV_KEY, code, value);
-	if (err != 0) {
-		perror("Error in writing EV_KEY event\n");
-		exit(err);
-	}
-
-	err = libevdev_uinput_write_event(uidev, EV_SYN, SYN_REPORT, 0);
-	if (err != 0) {
-		perror("Error in writing EV_SYN, SYN_REPORT, 0.\n");
-		exit(err);
-	}
-
-	debug("Sending %ld %d\n", code, value);
+	struct input_event e = {.type = EV_KEY, .code = key, .value = value};
+	gettimeofday(&e.time, NULL);
+	if (write(fd, &e, sizeof(e)) < 0)
+		return -1;
+	return 0;
 }
 
-/* return 0 on sent */
-static int send_2nd_fun_once(struct libevdev_uinput *uidev,
-		struct modkey *k, int value)
+static int send_sync(int fd)
 {
-	if (k->last_secondary_function_value != value) {
-		send_key_ev_and_sync(uidev, k->secondary_function, value);
-		k->last_secondary_function_value = value;
+	struct input_event s = {.type = EV_SYN, .code = SYN_REPORT, .value = 0};
+	gettimeofday(&s.time, NULL);
+	if (write(fd, &s, sizeof(s)) < 0)
+		return -1;
+	return 0;
+}
+
+static int send_key_and_sync(int fd, int key, int value)
+{
+	if (send_key(fd, key, value) < 0)
+		return -1;
+	if (send_sync(fd) < 0)
+		return -2;
+
+	return 0;
+}
+
+/* Return the number of keys sent, or -1 on error */
+static int send_2nd_fun_once(int fd, struct modkey *k, int value)
+{
+	if (k->last_value == value)
 		return 0;
-	} else {
-		return 1;
-	}
+
+	if (send_key_and_sync(fd, k->secondary_function, value) < 0)
+		return -1;
+
+	k->last_value = value;
+	return 1;
 }
 
-static void active_modkeys_send_1_once(struct libevdev_uinput *uidev)
+static int active_modkeys_send_1_once(int fd)
 {
 	for (size_t i = 0; i < COUNTOF(mod_map); i++) {
 		struct modkey *k = &mod_map[i];
-		if (k->value == 1 && k->secondary_function > 0)
-			send_2nd_fun_once(uidev, k, 1);
+		if (k->value == 1 && k->secondary_function > 0) {
+			if (send_2nd_fun_once(fd, k, 1) < 0)
+				return -1;
+		}
 	}
-}
-
-static inline void send_primary_fun(struct libevdev_uinput *uidev,
-		struct modkey *k, int value)
-{
-	send_key_ev_and_sync(uidev, modkey_primary_or_key(k), value);
+	return 0;
 }
 
 static long duration_to_now(struct timespec *t)
@@ -122,185 +119,173 @@ static long duration_to_now(struct timespec *t)
 	return timespec_to_ms(&tmp);
 }
 
-static void send_primary_on_short_stroke(struct libevdev_uinput *uidev,
-		struct modkey *k)
+static int send_primary_on_short_stroke(int fd, struct modkey *k)
 {
 	struct timespec t;
 	timespec_add(&k->last_time_down, &delay_timespec, &t);
 
 	/* Just ignore the stroke when it has been held for too long */
 	if (timespec_cmp_now(&t) > 0)
-		return;
+		return 0;
 
-	active_modkeys_send_1_once(uidev);
-	send_primary_fun(uidev, k, 1);
-	send_primary_fun(uidev, k, 0);
+	if (active_modkeys_send_1_once(fd) < 0)
+		return -1;
+	if (send_key(fd, modkey_primary_or_key(k), 1) < 0)
+		return -2;
+	if (send_key(fd, modkey_primary_or_key(k), 0) < 0)
+		return -3;
+	if (send_sync(fd))
+		return -4;
+	return 0;
 }
 
-static void handle_ev_modkey_with_2nd_fun(struct libevdev_uinput *uidev,
-		int value, struct modkey *k)
+static int handle_ev_modkey_with_2nd_fun(int fd, struct modkey *k, int value)
 {
+	int tmp;
 	if (value == 0) {
 		debug("Duration: %ld\n", duration_to_now(&k->last_time_down));
 		k->value = 0;
-		if (send_2nd_fun_once(uidev, k, 0)) {
-			/* 2nd fun NOT sent, it may be a normal stroke */
-			send_primary_on_short_stroke(uidev, k);
-		}
+		tmp = send_2nd_fun_once(fd, k, 0);
+		if (tmp < 0)
+			return -1;
+		if (tmp > 0)
+			return 0;
+
+		/* 2nd fun NOT sent, it may be a normal stroke */
+		if (send_primary_on_short_stroke(fd, k) < 0)
+			return -1;
 	} else if (value == 1) {
 		k->value = 1;
 		clock_gettime(CLOCK_MONOTONIC, &k->last_time_down);
 	} else {
 		/* Ignore */
 	}
+	return 0;
 }
 
-static void handle_ev_modkey_no_2nd_fun(struct libevdev_uinput *uidev,
-		int value, struct modkey *k)
+static int handle_ev_modkey_no_2nd_fun(int fd, struct modkey *k, int value)
 {
-	if (value == 1)
-		active_modkeys_send_1_once(uidev);
-
-	send_primary_fun(uidev, k, value);
-}
-
-static void handle_ev_normal_key(struct libevdev_uinput *uidev,
-		int value, long code)
-{
-	if (value == 1)
-		active_modkeys_send_1_once(uidev);
-
-	send_key_ev_and_sync(uidev, code, value);
-}
-
-static void handle_ev_key(struct libevdev_uinput *uidev, long code, int value)
-{
-	int i = mod_map_find(code);
-	if (i >= 0) {
-		struct modkey *k = &mod_map[i];
-		if (k->secondary_function > 0) {
-			handle_ev_modkey_with_2nd_fun(uidev, value, k);
-		} else {
-			handle_ev_modkey_no_2nd_fun(uidev, value, k);
-		}
-	} else {
-		handle_ev_normal_key(uidev, value, code);
+	if (value == 1) {
+		if (active_modkeys_send_1_once(fd) < 0)
+			return -1;
 	}
+
+	if (send_key_and_sync(fd, modkey_primary_or_key(k), value) < 0)
+		return -2;
+
+	return 0;
+
 }
 
-/*
- * The official documents of `libevdev' says:
- *   You do not need libevdev_has_event_pending()
- *   if you're using select(2) or poll(2).
- *
- * But that's not the case for this program.
- * We need to call `libevdev_has_event_pending' before `poll'.
- */
-static void evdev_block_for_events(struct libevdev *dev)
+static int handle_ev_normal_key(int fd, int code, int value)
 {
-	struct pollfd poll_fd = {
-		.fd = libevdev_get_fd(dev),
-		.events = POLLIN
-	};
-	int has_pending_events = libevdev_has_event_pending(dev);
-	if (has_pending_events == 1) {
-		/* Nothing to do. */
-	} else if (has_pending_events == 0) {
-		/* Block waiting for new events. */
-		if (poll(&poll_fd, 1, -1) <= 0) {
-			perror("poll failed");
-			exit(1);
-		}
-	} else if (has_pending_events < 0) {
-		perror("libevdev check pending failed");
-		exit(1);
+	if (value == 1) {
+		if (active_modkeys_send_1_once(fd) < 0)
+			return -1;
 	}
+
+	if (send_key_and_sync(fd, code, value) < 0)
+		return -2;
+
+	return 0;
 }
 
-static int evdev_read_and_skip_sync(struct libevdev *dev,
-		struct input_event *event)
+static int handle_ev_key(int fd, long code, int value)
 {
-	int r = libevdev_next_event(
-			dev,
-			LIBEVDEV_READ_FLAG_NORMAL | LIBEVDEV_READ_FLAG_BLOCKING,
-			event);
+	struct modkey *k;
+	int i;
 
-	if (r != LIBEVDEV_READ_STATUS_SYNC)
-		return r;
+	i = mod_map_find(code);
+	if (i < 0)
+		return handle_ev_normal_key(fd, code, value);
 
-	while (r == LIBEVDEV_READ_STATUS_SYNC)
-		r = libevdev_next_event(dev, LIBEVDEV_READ_FLAG_SYNC, event);
-
-	return r;
+	k = &mod_map[i];
+	if (k->secondary_function > 0)
+		return handle_ev_modkey_with_2nd_fun(fd, k, value);
+	else
+		return handle_ev_modkey_no_2nd_fun(fd, k, value);
 }
 
-int main(int argc, char **argv)
+int main(int argc, const char **argv)
 {
+	struct uinput_user_dev uidev = {0};
+	struct input_event ev = {0};
+	int read_fd, uinput_fd, i;
+
 	if (argc < 2) {
 		log_error("Argument Error: Argument missing.\n");
-		exit(1);
+		return 1;
 	}
 
-	ms_to_timespec(max_delay, &delay_timespec);
+	/* Sleep 100ms on startup, or the program behave weird. */
+	usleep(100000);
+
+	read_fd = open(argv[1], O_RDONLY);
+	if (read_fd < 0) {
+		perror("Failed to open the source keyboard\n");
+		return 2;
+	}
+
+	ioctl(read_fd, EVIOCGRAB, 0);
+	if (ioctl(read_fd, EVIOCGRAB, 1) < 0) {
+		perror("EVIOCGRAB failed");
+		goto err1;
+	}
+
+	uinput_fd = open("/dev/uinput", O_WRONLY | O_NONBLOCK);
+	if (uinput_fd < 0) {
+		perror("Failed to open /dev/uinput.\n");
+		goto err2;
+	}
+
+	if (ioctl(uinput_fd, UI_SET_EVBIT, EV_KEY) != 0) {
+		log_error("Failed on UI_SET_EVBIT.\n");
+		goto err3;
+	}
+
+	for (i = 0; i <= KEY_MAX; ++i) {
+		if (ioctl(uinput_fd, UI_SET_KEYBIT, i) != 0) {
+			log_error("Failed on UI_SET_EVBIT.\n");
+			goto err3;
+		}
+	}
+
+	snprintf(uidev.name, UINPUT_MAX_NAME_SIZE, "key-remapper");
+	uidev.id.bustype = BUS_USB;
+	if (write(uinput_fd, &uidev, sizeof(uidev)) < 0) {
+		log_error("Failed configure virtual device.\n");
+		goto err3;
+	}
+
+	if (ioctl(uinput_fd, UI_DEV_CREATE) != 0) {
+		log_error("Failed UI_DEV_CREATE.\n");
+		goto err3;
+	}
+
+	/* Give time for device to register */
+	sleep(1);
 
 	debug("Simple Keyboard Remapper is started.\n");
 
-	/* let (KEY_ENTER), value 0 go through */
-	usleep(100000);
+	ms_to_timespec(max_delay, &delay_timespec);
 
-	int read_fd = open(argv[1], O_RDONLY);
-	if (read_fd < 0) {
-		perror("Failed to open device\n");
-		exit(1);
-	}
-
-	int ret;
-
-	struct libevdev *dev = NULL;
-	ret = libevdev_new_from_fd(read_fd, &dev);
-	if (ret < 0) {
-		log_error("Failed to init libevdev (%s)\n", strerror(-ret));
-		exit(1);
-	}
-
-	int write_fd = open("/dev/uinput", O_RDWR);
-	if (write_fd < 0) {
-		log_error("uifd < 0 (check your privileges)\n");
-		return -errno;
-	}
-
-	struct libevdev_uinput *uidev;
-
-	/* IMPORTANT:
-	 * Creating a new input device. (e.g. /dev/input/event18)
-	 */
-	ret = libevdev_uinput_create_from_device(dev, write_fd, &uidev);
-	if (ret != 0)
-		return ret;
-
-	/* IMPORTANT:
-	 * Blocking the events of the original keyboard device.
-	 */
-	ret = libevdev_grab(dev, LIBEVDEV_GRAB);
-	if (ret < 0) {
-		log_error("grab < 0\n");
-		return -errno;
-	}
-
-	do {
-		evdev_block_for_events(dev);
-		struct input_event event;
-		ret = evdev_read_and_skip_sync(dev, &event);
-		if (ret == LIBEVDEV_READ_STATUS_SUCCESS) {
-			if (event.type == EV_KEY)
-				handle_ev_key(uidev, event.code, event.value);
+	while (read(read_fd, &ev, sizeof(ev)) > 0) {
+		if (ev.type == EV_KEY) {
+			if (handle_ev_key(uinput_fd, ev.code, ev.value) < 0)
+				goto err4;
 		}
-	} while (ret == LIBEVDEV_READ_STATUS_SYNC ||
-			ret == LIBEVDEV_READ_STATUS_SUCCESS ||
-			ret == -EAGAIN);
-
-	if (ret != LIBEVDEV_READ_STATUS_SUCCESS && ret != -EAGAIN)
-		log_error("Failed to handle events: %s\n", strerror(-ret));
+	}
 
 	return 0;
+
+err4:
+	ioctl(uinput_fd, UI_DEV_DESTROY);
+err3:
+	close(uinput_fd);
+err2:
+	ioctl(read_fd, EVIOCGRAB, 0);
+err1:
+	close(read_fd);
+
+	return -1;
 }

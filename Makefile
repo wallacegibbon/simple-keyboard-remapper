@@ -1,6 +1,4 @@
 INSTALL_PATH = /usr/local/bin
-C_FLAGS := $(shell pkg-config --cflags libevdev)
-LD_FLAGS := $(shell pkg-config --libs libevdev)
 
 ifeq ($(DEBUG), 1)
 	C_FLAGS += -DDEBUG=1
@@ -9,7 +7,7 @@ endif
 all: simple-keyboard-remapper
 
 simple-keyboard-remapper: remapper.o time_util.o
-	gcc -o $@ $^ $(LD_FLAGS)
+	gcc -o $@ $^
 
 remapper.o: remapper.c time_util.h
 	gcc -c -o $@ $< $(C_FLAGS)
