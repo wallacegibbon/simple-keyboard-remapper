@@ -15,13 +15,8 @@
 #define COUNTOF(x) (sizeof(x) / sizeof(*(x)))
 
 struct modkey {
-	long key;
-	long primary_function;
-	long secondary_function;
-
-	long value;
-	long last_value;
-
+	long key, primary_function, secondary_function;
+	long value, last_value;
 	struct timespec last_time_down;
 };
 
@@ -31,15 +26,12 @@ struct modkey mod_map[] = {
 };
 
 /*
- * If a key is held down for a time greater than max_delay,
+ * If a key is held down for a time (milleseconds) greater than max_delay,
  * it will not send its primary function when released.
  */
 long max_delay = 200;
 
-/*
- * Max delay set by user stored as a timespec struct.
- * It will be filled with `max_delay'.
- */
+/* Will be filled with `max_delay'. */
 struct timespec delay_timespec;
 
 static inline int modkey_primary_or_key(struct modkey *self)
@@ -61,26 +53,11 @@ static int mod_map_find(long key)
 static int send_key(int fd, int key, int value)
 {
 	struct input_event e = {.type = EV_KEY, .code = key, .value = value};
-	gettimeofday(&e.time, NULL);
+	struct input_event s = {.type = EV_SYN, .code = SYN_REPORT};
+
 	if (write(fd, &e, sizeof(e)) < 0)
 		return -1;
-	return 0;
-}
-
-static int send_sync(int fd)
-{
-	struct input_event s = {.type = EV_SYN, .code = SYN_REPORT, .value = 0};
-	gettimeofday(&s.time, NULL);
 	if (write(fd, &s, sizeof(s)) < 0)
-		return -1;
-	return 0;
-}
-
-static int send_key_and_sync(int fd, int key, int value)
-{
-	if (send_key(fd, key, value) < 0)
-		return -1;
-	if (send_sync(fd) < 0)
 		return -2;
 
 	return 0;
@@ -92,7 +69,7 @@ static int send_2nd_fun_once(int fd, struct modkey *k, int value)
 	if (k->last_value == value)
 		return 0;
 
-	if (send_key_and_sync(fd, k->secondary_function, value) < 0)
+	if (send_key(fd, k->secondary_function, value) < 0)
 		return -1;
 
 	k->last_value = value;
@@ -134,8 +111,6 @@ static int send_primary_on_short_stroke(int fd, struct modkey *k)
 		return -2;
 	if (send_key(fd, modkey_primary_or_key(k), 0) < 0)
 		return -3;
-	if (send_sync(fd))
-		return -4;
 	return 0;
 }
 
@@ -170,11 +145,10 @@ static int handle_ev_modkey_no_2nd_fun(int fd, struct modkey *k, int value)
 			return -1;
 	}
 
-	if (send_key_and_sync(fd, modkey_primary_or_key(k), value) < 0)
+	if (send_key(fd, modkey_primary_or_key(k), value) < 0)
 		return -2;
 
 	return 0;
-
 }
 
 static int handle_ev_normal_key(int fd, int code, int value)
@@ -184,7 +158,7 @@ static int handle_ev_normal_key(int fd, int code, int value)
 			return -1;
 	}
 
-	if (send_key_and_sync(fd, code, value) < 0)
+	if (send_key(fd, code, value) < 0)
 		return -2;
 
 	return 0;
