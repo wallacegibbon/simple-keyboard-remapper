@@ -220,7 +220,7 @@ int main(int argc, const char **argv)
 		goto err1;
 	}
 
-	uinput_fd = open("/dev/uinput", O_WRONLY | O_NONBLOCK);
+	uinput_fd = open("/dev/uinput", O_WRONLY);
 	if (uinput_fd < 0) {
 		perror("Failed to open /dev/uinput.\n");
 		goto err2;
