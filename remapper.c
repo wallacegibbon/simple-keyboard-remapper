@@ -15,8 +15,8 @@
 #define COUNTOF(x) (sizeof(x) / sizeof(*(x)))
 
 struct modkey {
-	long key, primary_function, secondary_function;
-	long value, last_value;
+	long key, primary_function, secondary_function;	/* key codes */
+	long value, last_value;	/* key values */
 	struct timespec last_time_down;
 };
 
@@ -50,6 +50,12 @@ static int mod_map_find(long key)
 	return -1;
 };
 
+/*
+ * For functions that may send `input_event` data, return positive number of
+ * data sent, or negagive number on error.  (SYN is not calculated)
+ */
+
+/* This function always return 1 on successful sent */
 static int send_key(int fd, int key, int value)
 {
 	struct input_event e = {.type = EV_KEY, .code = key, .value = value};
@@ -60,11 +66,10 @@ static int send_key(int fd, int key, int value)
 	if (write(fd, &s, sizeof(s)) < 0)
 		return -2;
 
-	return 0;
+	return 1;
 }
 
-/* Return the number of keys sent, or -1 on error */
-static int send_2nd_fun_once(int fd, struct modkey *k, int value)
+static int try_send_2nd(int fd, struct modkey *k, int value)
 {
 	if (k->last_value == value)
 		return 0;
@@ -78,14 +83,18 @@ static int send_2nd_fun_once(int fd, struct modkey *k, int value)
 
 static int active_modkeys_send_1_once(int fd)
 {
+	int n = 0, t = 0;
+
 	for (size_t i = 0; i < COUNTOF(mod_map); i++) {
 		struct modkey *k = &mod_map[i];
 		if (k->value == 1 && k->secondary_function > 0) {
-			if (send_2nd_fun_once(fd, k, 1) < 0)
+			if ((t = try_send_2nd(fd, k, 1)) < 0)
 				return -1;
+			else
+				n += t;
 		}
 	}
-	return 0;
+	return n;
 }
 
 static long duration_to_now(struct timespec *t)
@@ -99,85 +108,91 @@ static long duration_to_now(struct timespec *t)
 static int send_primary_on_short_stroke(int fd, struct modkey *k)
 {
 	struct timespec t;
+	int n = 0;
+
 	timespec_add(&k->last_time_down, &delay_timespec, &t);
 
 	/* Just ignore the stroke when it has been held for too long */
 	if (timespec_cmp_now(&t) > 0)
 		return 0;
 
-	if (active_modkeys_send_1_once(fd) < 0)
+	if ((n = active_modkeys_send_1_once(fd)) < 0)
 		return -1;
+
 	if (send_key(fd, modkey_primary_or_key(k), 1) < 0)
 		return -2;
+
 	if (send_key(fd, modkey_primary_or_key(k), 0) < 0)
 		return -3;
-	return 0;
+
+	return n + 2;
 }
 
-static int handle_ev_modkey_with_2nd_fun(int fd, struct modkey *k, int value)
+static int handle_complex(int fd, struct modkey *k, int value)
 {
-	int tmp;
-	if (value == 0) {
-		debug("Duration: %ld\n", duration_to_now(&k->last_time_down));
-		k->value = 0;
-		tmp = send_2nd_fun_once(fd, k, 0);
-		if (tmp < 0)
-			return -1;
-		if (tmp > 0)
-			return 0;
+	int n = 0;
 
-		/* 2nd fun NOT sent, it may be a normal stroke */
-		if (send_primary_on_short_stroke(fd, k) < 0)
-			return -1;
-	} else if (value == 1) {
+	if (value < 0 || value >= 2)
+		return 0;
+
+	/* Key press.  Just record it and update key down time */
+	if (value == 1) {
 		k->value = 1;
 		clock_gettime(CLOCK_MONOTONIC, &k->last_time_down);
-	} else {
-		/* Ignore */
-	}
-	return 0;
-}
-
-static int handle_ev_modkey_no_2nd_fun(int fd, struct modkey *k, int value)
-{
-	if (value == 1) {
-		if (active_modkeys_send_1_once(fd) < 0)
-			return -1;
+		return 0;
 	}
 
-	if (send_key(fd, modkey_primary_or_key(k), value) < 0)
-		return -2;
+	/* Key release.  This is the complex situation */
 
-	return 0;
+	debug("Duration: %ld\n", duration_to_now(&k->last_time_down));
+
+	k->value = 0;
+	if ((n = try_send_2nd(fd, k, 0)) < 0)
+		return -1;
+
+	/* 2nd fun is sent */
+	if (n > 0)
+		return n;
+
+	/* Here, n is 0 */
+
+	/* 2nd fun NOT sent, it may be a normal stroke (unless timeout) */
+	if ((n = send_primary_on_short_stroke(fd, k)) < 0)
+		return -1;
+
+	return n;
 }
 
-static int handle_ev_normal_key(int fd, int code, int value)
+static int handle_normal(int fd, int code, int value)
 {
+	int n = 0;
+
+	/* For simple keys, we send modkeys on press, not release */
 	if (value == 1) {
-		if (active_modkeys_send_1_once(fd) < 0)
+		if ((n = active_modkeys_send_1_once(fd)) < 0)
 			return -1;
 	}
 
 	if (send_key(fd, code, value) < 0)
 		return -2;
 
-	return 0;
+	return n + 1;
 }
 
-static int handle_ev_key(int fd, long code, int value)
+static int handle_ev(int fd, long code, int value)
 {
 	struct modkey *k;
 	int i;
 
 	i = mod_map_find(code);
 	if (i < 0)
-		return handle_ev_normal_key(fd, code, value);
+		return handle_normal(fd, code, value);
 
 	k = &mod_map[i];
 	if (k->secondary_function > 0)
-		return handle_ev_modkey_with_2nd_fun(fd, k, value);
+		return handle_complex(fd, k, value);
 	else
-		return handle_ev_modkey_no_2nd_fun(fd, k, value);
+		return handle_normal(fd, modkey_primary_or_key(k), value);
 }
 
 int main(int argc, const char **argv)
@@ -200,7 +215,6 @@ int main(int argc, const char **argv)
 		return 2;
 	}
 
-	ioctl(read_fd, EVIOCGRAB, 0);
 	if (ioctl(read_fd, EVIOCGRAB, 1) < 0) {
 		perror("EVIOCGRAB failed");
 		goto err1;
@@ -245,7 +259,7 @@ int main(int argc, const char **argv)
 
 	while (read(read_fd, &ev, sizeof(ev)) > 0) {
 		if (ev.type == EV_KEY) {
-			if (handle_ev_key(uinput_fd, ev.code, ev.value) < 0)
+			if (handle_ev(uinput_fd, ev.code, ev.value) < 0)
 				goto err4;
 		}
 	}
