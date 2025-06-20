@@ -41,13 +41,17 @@ static inline int modkey_primary_or_key(struct modkey *self)
 		: self->key;
 }
 
-static int mod_map_find(long key)
+static struct modkey *mod_map_find(long key)
 {
-	for (size_t i = 0; i < COUNTOF(mod_map); i++) {
-		if (mod_map[i].key == key)
-			return i;
+	struct modkey *cursor = mod_map;
+	struct modkey *end = mod_map + COUNTOF(mod_map);
+	while (cursor < end) {
+		if (cursor->key == key)
+			return cursor;
+		else
+			++cursor;
 	}
-	return -1;
+	return NULL;
 };
 
 /*
@@ -181,15 +185,11 @@ static int handle_normal(int fd, int code, int value)
 
 static int handle_ev(int fd, long code, int value)
 {
-	struct modkey *k;
-	int i;
-
-	i = mod_map_find(code);
-	if (i < 0)
+	struct modkey *k = mod_map_find(code);
+	if (k == NULL)
 		return handle_normal(fd, code, value);
 
-	k = &mod_map[i];
-	if (k->secondary_function > 0)
+	if (k->secondary_function != 0)
 		return handle_complex(fd, k, value);
 	else
 		return handle_normal(fd, modkey_primary_or_key(k), value);
