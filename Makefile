@@ -1,5 +1,5 @@
 TARGET = simple-keyboard-remapper
-INSTALL_PATH = /usr/local/bin
+INSTALL_PATH = /usr/bin
 SYSTEM_PATH = /etc/systemd/system
 
 ifeq ($(DEBUG), 1)
@@ -19,7 +19,7 @@ time_util.o: time_util.c time_util.h
 .PHONY: install uninstall clean showlog
 
 install: $(TARGET)
-	cp $< $(INSTALL_PATH)
+	cp $< $(INSTALL_PATH)/
 	cp $(TARGET).service $(SYSTEM_PATH)/
 	./fix_device.sh $(SYSTEM_PATH)/$(TARGET).service
 	systemctl daemon-reload
