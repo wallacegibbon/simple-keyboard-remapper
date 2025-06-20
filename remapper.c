@@ -16,7 +16,7 @@
 
 struct modkey {
 	long key, primary_function, secondary_function;	/* key codes */
-	long value, last_value;	/* key values */
+	long value, last_value;				/* key values */
 	struct timespec last_time_down;
 };
 
@@ -59,7 +59,7 @@ static struct modkey *mod_map_find(long key)
  * data sent, or negagive number on error.  (SYN is not calculated)
  */
 
-/* This function always return 1 on successful sent */
+/* This function always return 1 on successful sent. */
 static int send_key(int fd, int key, int value)
 {
 	struct input_event e = {.type = EV_KEY, .code = key, .value = value};
@@ -117,7 +117,7 @@ static int send_primary_on_short_stroke(int fd, struct modkey *k)
 
 	timespec_add(&k->last_time_down, &delay_timespec, &t);
 
-	/* Just ignore the stroke when it has been held for too long */
+	/* Just ignore the stroke when it has been held for too long. */
 	if (timespec_cmp_now(&t) > 0)
 		return 0;
 
@@ -140,40 +140,33 @@ static int handle_complex(int fd, struct modkey *k, int value)
 	if (value < 0 || value > 2)
 		return 0;
 
-	/* Key press.  Just record it and update key down time */
+	/* Key press.  Just record it and update key down time. */
 	if (value == 1) {
 		k->value = 1;
 		clock_gettime(CLOCK_MONOTONIC, &k->last_time_down);
 		return 0;
 	}
 
-	/*
-	 * Key repeat.  which means key has been held for some time.
-	 * we check the timeout here.
-	 */
+	/* Key repeat.  which means key has been held for some time. */
 	if (value == 2) {
 		if ((n = try_send_2nd(fd, k, 1)) < 0)
 			return -1;
 		return 0;
 	}
 
-	/* Key release.  This is the complex situation */
+	/* Key release.  This is the complex situation. */
+
 	debug("Duration: %ld\n", duration_to_now(&k->last_time_down));
 
 	k->value = 0;
 	if ((n = try_send_2nd(fd, k, 0)) < 0)
 		return -1;
 
-	/* 2nd fun is sent */
+	/* 2nd fun is sent on this release, done. */
 	if (n > 0)
 		return n;
 
-	/*
-	 * `n` is 0 here, which means last_value is already 0, which means
-	 * 2nd fun was not sent.  So this may be a normal keystroke.
-	 * (unless timeout)
-	 */
-
+	/* The 2nd fun was not sent, send primary key unless timeout. */
 	if ((n = send_primary_on_short_stroke(fd, k)) < 0)
 		return -1;
 
@@ -184,7 +177,7 @@ static int handle_normal(int fd, int code, int value)
 {
 	int n = 0;
 
-	/* For simple keys, we send modkeys on press, not release */
+	/* For simple keys, we send modkeys on press, not release. */
 	if (value == 1) {
 		if ((n = active_modkeys_send_1_once(fd)) < 0)
 			return -1;
@@ -273,7 +266,7 @@ int main(int argc, const char **argv)
 		goto err3;
 	}
 
-	/* Give time for device to register */
+	/* Give time for device to register. */
 	sleep(1);
 
 	debug("Simple Keyboard Remapper is started.\n");
