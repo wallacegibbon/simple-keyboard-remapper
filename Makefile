@@ -1,12 +1,14 @@
+TARGET = simple-keyboard-remapper
 INSTALL_PATH = /usr/local/bin
+SYSTEM_PATH = /etc/systemd/system
 
 ifeq ($(DEBUG), 1)
 	C_FLAGS += -DDEBUG=1
 endif
 
-all: simple-keyboard-remapper
+all: $(TARGET)
 
-simple-keyboard-remapper: remapper.o time_util.o
+$(TARGET): remapper.o time_util.o
 	gcc -o $@ $^
 
 remapper.o: remapper.c time_util.h
@@ -16,20 +18,22 @@ time_util.o: time_util.c time_util.h
 
 .PHONY: install uninstall clean showlog
 
-install: simple-keyboard-remapper
+install: $(TARGET)
 	cp $< $(INSTALL_PATH)
-	cp simple-keyboard-remapper.service /etc/systemd/system/
-	./fix_device.sh
-	systemctl enable simple-keyboard-remapper.service
-	systemctl start simple-keyboard-remapper.service
+	cp $(TARGET).service $(SYSTEM_PATH)/
+	./fix_device.sh $(SYSTEM_PATH)/$(TARGET).service
+	systemctl daemon-reload
+	systemctl enable $(TARGET).service
+	systemctl start $(TARGET).service
 
 uninstall:
-	systemctl stop simple-keyboard-remapper.service
-	rm /etc/systemd/system/simple-keyboard-remapper.service
-	rm /usr/local/bin/simple-keyboard-remapper
+	systemctl stop $(TARGET).service
+	rm $(SYSTEM_PATH)/$(TARGET).service
+	rm $(INSTALL_PATH)/$(TARGET)
+	systemctl daemon-reload
 
 clean:
-	rm -f simple-keyboard-remapper *.o
+	rm -f $(TARGET) *.o
 
 showlog:
-	journalctl -u simple-keyboard-remapper -f
+	journalctl -u $(TARGET) -f

@@ -30,7 +30,7 @@ void timespec_add(struct timespec *t1, struct timespec *t2,
 	t->tv_nsec = t1->tv_nsec + t2->tv_nsec;
 	if (t->tv_nsec >= 1000000000) {
 		t->tv_nsec -= 1000000000;
-		t->tv_sec++;
+		++t->tv_sec;
 	}
 }
 
@@ -42,6 +42,6 @@ void timespec_sub(struct timespec *t1, struct timespec *t2,
 	t->tv_nsec = t1->tv_nsec - t2->tv_nsec;
 	if (t->tv_nsec < 0) {
 		t->tv_nsec += 1000000000;
-		t->tv_sec--;
+		--t->tv_sec;
 	}
 }

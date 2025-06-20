@@ -43,14 +43,14 @@ static inline int modkey_primary_or_key(struct modkey *self)
 
 static struct modkey *mod_map_find(long key)
 {
-	struct modkey *cursor = mod_map;
+	struct modkey *m = mod_map;
 	struct modkey *end = mod_map + COUNTOF(mod_map);
-	while (cursor < end) {
-		if (cursor->key == key)
-			return cursor;
-		else
-			++cursor;
+
+	for (; m < end; ++m) {
+		if (m->key == key)
+			return m;
 	}
+
 	return NULL;
 };
 
@@ -88,17 +88,18 @@ static int try_send_2nd(int fd, struct modkey *k, int value)
 
 static int active_modkeys_send_1_once(int fd)
 {
-	int n = 0, t = 0;
+	struct modkey *m = mod_map;
+	struct modkey *end = mod_map + COUNTOF(mod_map);
+	int n = 0, t;
 
-	for (size_t i = 0; i < COUNTOF(mod_map); i++) {
-		struct modkey *k = &mod_map[i];
-		if (k->value == 1 && k->secondary_function > 0) {
-			if ((t = try_send_2nd(fd, k, 1)) < 0)
+	for (; m < end; ++m) {
+		if (m->value == 1 && m->secondary_function > 0) {
+			if ((t = try_send_2nd(fd, m, 1)) < 0)
 				return -1;
-			else
-				n += t;
+			n += t;
 		}
 	}
+
 	return n;
 }
 

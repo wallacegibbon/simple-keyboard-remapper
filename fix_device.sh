@@ -18,5 +18,4 @@ event*)
 	;;
 esac
 
-sed -i "s/event0/$first_kbd/" \
-	/etc/systemd/system/simple-keyboard-remapper.service
+sed -i "s/event0/$first_kbd/" $1
