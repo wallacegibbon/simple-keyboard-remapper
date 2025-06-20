@@ -199,7 +199,10 @@ int main(int argc, const char **argv)
 {
 	struct uinput_user_dev uidev = {0};
 	struct input_event ev = {0};
-	int read_fd, uinput_fd, i;
+	int physical_fd, uinput_fd, i;
+
+#define LONGBITS (8 * sizeof(unsigned long))
+	unsigned long kbits[KEY_MAX / LONGBITS + 1] = {0};
 
 	if (argc < 2) {
 		log_error("Argument Error: Argument missing.\n");
@@ -209,14 +212,19 @@ int main(int argc, const char **argv)
 	/* Sleep 100ms on startup, or the program behave weird. */
 	usleep(100000);
 
-	read_fd = open(argv[1], O_RDONLY);
-	if (read_fd < 0) {
+	physical_fd = open(argv[1], O_RDONLY);
+	if (physical_fd < 0) {
 		perror("Failed to open the source keyboard\n");
 		return 2;
 	}
 
-	if (ioctl(read_fd, EVIOCGRAB, 1) < 0) {
+	if (ioctl(physical_fd, EVIOCGRAB, 1) < 0) {
 		perror("EVIOCGRAB failed");
+		goto err1;
+	}
+
+	if (ioctl(physical_fd, EVIOCGBIT(EV_KEY, sizeof(kbits)), kbits) < 0) {
+		perror("EVIOCGBIT");
 		goto err1;
 	}
 
@@ -232,13 +240,15 @@ int main(int argc, const char **argv)
 	}
 
 	for (i = 0; i <= KEY_MAX; ++i) {
-		if (ioctl(uinput_fd, UI_SET_KEYBIT, i) != 0) {
-			log_error("Failed on UI_SET_EVBIT.\n");
-			goto err3;
+		if (kbits[i / LONGBITS] & (1UL << (i % LONGBITS))) {
+			if (ioctl(uinput_fd, UI_SET_KEYBIT, i) != 0) {
+				log_error("Failed on UI_SET_EVBIT.\n");
+				goto err3;
+			}
 		}
 	}
 
-	snprintf(uidev.name, UINPUT_MAX_NAME_SIZE, "key-remapper");
+	snprintf(uidev.name, UINPUT_MAX_NAME_SIZE, "Keyboard Remapper");
 	uidev.id.bustype = BUS_USB;
 	if (write(uinput_fd, &uidev, sizeof(uidev)) < 0) {
 		log_error("Failed configure virtual device.\n");
@@ -257,7 +267,7 @@ int main(int argc, const char **argv)
 
 	ms_to_timespec(max_delay, &delay_timespec);
 
-	while (read(read_fd, &ev, sizeof(ev)) > 0) {
+	while (read(physical_fd, &ev, sizeof(ev)) > 0) {
 		if (ev.type == EV_KEY) {
 			if (handle_ev(uinput_fd, ev.code, ev.value) < 0)
 				goto err4;
@@ -271,9 +281,9 @@ err4:
 err3:
 	close(uinput_fd);
 err2:
-	ioctl(read_fd, EVIOCGRAB, 0);
+	ioctl(physical_fd, EVIOCGRAB, 0);
 err1:
-	close(read_fd);
+	close(physical_fd);
 
 	return -1;
 }
