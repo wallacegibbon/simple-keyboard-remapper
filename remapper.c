@@ -70,6 +70,7 @@ static int send_key(int fd, int key, int value)
 	if (write(fd, &s, sizeof(s)) < 0)
 		return -2;
 
+	debug("Key: %d (value: %d)\n", key, value);
 	return 1;
 }
 
@@ -136,7 +137,7 @@ static int handle_complex(int fd, struct modkey *k, int value)
 {
 	int n = 0;
 
-	if (value < 0 || value >= 2)
+	if (value < 0 || value > 2)
 		return 0;
 
 	/* Key press.  Just record it and update key down time */
@@ -146,8 +147,17 @@ static int handle_complex(int fd, struct modkey *k, int value)
 		return 0;
 	}
 
-	/* Key release.  This is the complex situation */
+	/*
+	 * Key repeat.  which means key has been held for some time.
+	 * we check the timeout here.
+	 */
+	if (value == 2) {
+		if ((n = try_send_2nd(fd, k, 1)) < 0)
+			return -1;
+		return 0;
+	}
 
+	/* Key release.  This is the complex situation */
 	debug("Duration: %ld\n", duration_to_now(&k->last_time_down));
 
 	k->value = 0;
@@ -158,9 +168,12 @@ static int handle_complex(int fd, struct modkey *k, int value)
 	if (n > 0)
 		return n;
 
-	/* Here, n is 0 */
+	/*
+	 * `n` is 0 here, which means last_value is already 0, which means
+	 * 2nd fun was not sent.  So this may be a normal keystroke.
+	 * (unless timeout)
+	 */
 
-	/* 2nd fun NOT sent, it may be a normal stroke (unless timeout) */
 	if ((n = send_primary_on_short_stroke(fd, k)) < 0)
 		return -1;
 
