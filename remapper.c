@@ -6,7 +6,7 @@
 
 #define log_error(...) fprintf(stderr, __VA_ARGS__)
 
-#if (DEBUG == 1)
+#if DEBUG == 1
 #define debug(...) do { printf(__VA_ARGS__); fflush(stdout); } while (0)
 #else
 #define debug(...) (void)0
@@ -26,12 +26,12 @@ struct modkey mod_map[] = {
 };
 
 /*
- * If a key is held down for a time (milleseconds) greater than max_delay,
- * it will not send its primary function when released.
+ * If a key is held down for more than MAX_DELAY_MILLI_SEC,  it will not send
+ * its primary function when released.
  */
-long max_delay = 200;
+#define MAX_DELAY_MILLI_SEC	200
 
-/* Will be filled with `max_delay'. */
+/* Will be filled with `MAX_DELAY_MILLI_SEC'. */
 struct timespec delay_timespec;
 
 static inline int modkey_primary_or_key(struct modkey *self)
@@ -90,13 +90,12 @@ static int active_modkeys_send_1_once(int fd)
 {
 	struct modkey *m = mod_map;
 	struct modkey *end = mod_map + COUNTOF(mod_map);
-	int n = 0, t;
+	int n = 0, t = 0;
 
-	for (; m < end; ++m) {
+	for (; m < end; ++m, n += t) {
 		if (m->value == 1 && m->secondary_function > 0) {
 			if ((t = try_send_2nd(fd, m, 1)) < 0)
 				return -1;
-			n += t;
 		}
 	}
 
@@ -152,7 +151,8 @@ static int handle_complex(int fd, struct modkey *k, int value)
 	if (value == 2) {
 		if ((n = try_send_2nd(fd, k, 1)) < 0)
 			return -1;
-		return 0;
+		else
+			return 0;
 	}
 
 	/* Key release.  This is the complex situation. */
@@ -216,7 +216,7 @@ int main(int argc, const char **argv)
 		return 1;
 	}
 
-	/* Sleep 100ms on startup, or the program behave weird. */
+	/* !! Sleep 100ms on startup, or the program behave weird !! */
 	usleep(100000);
 
 	physical_fd = open(argv[1], O_RDONLY);
@@ -272,7 +272,7 @@ int main(int argc, const char **argv)
 
 	debug("Simple Keyboard Remapper is started.\n");
 
-	ms_to_timespec(max_delay, &delay_timespec);
+	ms_to_timespec(MAX_DELAY_MILLI_SEC, &delay_timespec);
 
 	while (read(physical_fd, &ev, sizeof(ev)) > 0) {
 		if (ev.type == EV_KEY) {

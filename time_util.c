@@ -2,18 +2,20 @@
 
 int timespec_cmp(struct timespec *t1, struct timespec *t2)
 {
-	if (t1->tv_sec > t2->tv_sec) {
+	if (t1->tv_sec > t2->tv_sec)
 		return 1;
-	} else if (t1->tv_sec < t2->tv_sec) {
+	if (t1->tv_sec < t2->tv_sec)
 		return -1;
-	} else {
-		if (t1->tv_nsec > t2->tv_nsec)
-			return 1;
-		else if (t1->tv_nsec < t2->tv_nsec)
-			return -1;
-		else
-			return 0;
-	}
+
+	/* `tv_sec` equals, now we compare `tv_nsec` */
+
+	if (t1->tv_nsec > t2->tv_nsec)
+		return 1;
+	if (t1->tv_nsec < t2->tv_nsec)
+		return -1;
+
+	/* All equals */
+	return 0;
 }
 
 int timespec_cmp_now(struct timespec *t)

@@ -1,48 +1,30 @@
 # Simple Keyboard Remapper
 
-This project is originally modified/simplified from The Janus Key project:
-	<https://github.com/pietroiusti/janus-key>
+This project was modified from [Janus Key](https://github.com/pietroiusti/janus-key).
+The `libevdev` dependency is removed, we use `uinput` directly.
 
-Some features (which are unnecessary for a pure Emacs users) are removed
-to keep the code super simple.
-
-And the `libevdev` dependency is removed, we use `uinput` directly.
-
-
-## Introduction
-
-This program will create a new virtual keyboard device with uinput
-and rebuild the events in this virtual device
-while blocking the original keyboard events.
-
-To find out the event file that your keyboard is bound to:
-```sh
-cat /proc/bus/input/devices | grep -i keyboard -B1 -A4
-```
-
-The installation process will use the first keyboard that is found.
+This program will create a new virtual keyboard device with `uinput`.  It
+grabs input from the physical keyboard and pipe events to that virtual device.
 
 
 ## Installation
 
-This will build, install, enable and start the service.
+To build, install, enable and start the service:
 
 ```shell
 make install
 ```
 
-To stop the service and uninstall the program:
+To stop, remove the service and uninstall the program:
 
 ```shell
 make uninstall
 ```
 
-You may need to change the device name in systemd file.
-
 
 ## Debug
 
-Build this project with DEBUG enabled:
+We can see event printing when this project is built with DEBUG enabled:
 ```shell
 make DEBUG=1
 ```
@@ -57,4 +39,9 @@ Or: (In the project path)
 
 ```shell
 sudo make showlog
+```
+
+To find out the event file that your keyboard is bound to:
+```sh
+cat /proc/bus/input/devices | grep -i keyboard -B1 -A4
 ```
