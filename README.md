@@ -32,16 +32,16 @@ make DEBUG=1
 After installation, we can read the log with this command:
 
 ```shell
-sudo journalctl -u simple-keyboard-remapper -f
+journalctl -u simple-keyboard-remapper -f
 ```
 
 Or: (In the project path)
 
 ```shell
-sudo make showlog
+make showlog
 ```
 
-To find out the event file that your keyboard is bound to:
+To find out the event file that our keyboard is bound to:
 ```sh
 cat /proc/bus/input/devices | grep -i keyboard -B1 -A4
 ```
