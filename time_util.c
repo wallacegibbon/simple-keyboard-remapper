@@ -18,7 +18,7 @@ int timespec_cmp(struct timespec *t1, struct timespec *t2)
 	return 0;
 }
 
-int timespec_cmp_now(struct timespec *t)
+int timespec_cmp_now_t(struct timespec *t)
 {
 	struct timespec now;
 	clock_gettime(CLOCK_MONOTONIC, &now);

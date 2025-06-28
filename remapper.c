@@ -102,7 +102,7 @@ static int active_modkeys_send_1_once(int fd)
 	return n;
 }
 
-static long duration_to_now(struct timespec *t)
+static inline long duration_to_now(struct timespec *t)
 {
 	struct timespec now, tmp;
 	clock_gettime(CLOCK_MONOTONIC, &now);
@@ -110,68 +110,74 @@ static long duration_to_now(struct timespec *t)
 	return timespec_to_ms(&tmp);
 }
 
-static int send_primary_on_short_stroke(int fd, struct modkey *k)
+static inline int modkey_timeout(struct modkey *k)
 {
 	struct timespec t;
-	int n = 0;
-
 	timespec_add(&k->last_time_down, &delay_timespec, &t);
+	return timespec_cmp_now_t(&t) > 0;
+}
 
-	/* Just ignore the stroke when it has been held for too long. */
-	if (timespec_cmp_now(&t) > 0)
-		return 0;
-
+static int send_primary_down_up(int fd, struct modkey *k)
+{
+	int n = 0;
 	if ((n = active_modkeys_send_1_once(fd)) < 0)
 		return -1;
-
 	if (send_key(fd, modkey_primary_or_key(k), 1) < 0)
 		return -2;
-
 	if (send_key(fd, modkey_primary_or_key(k), 0) < 0)
 		return -3;
-
 	return n + 2;
 }
 
-static int handle_complex(int fd, struct modkey *k, int value)
+static int handle_complex_down(int fd, struct modkey *k)
+{
+	k->value = 1;
+	clock_gettime(CLOCK_MONOTONIC, &k->last_time_down);
+	return 0;
+}
+
+static int handle_complex_up(int fd, struct modkey *k)
 {
 	int n = 0;
-
-	if (value < 0 || value > 2)
-		return 0;
-
-	/* Key press.  Just record it and update key down time. */
-	if (value == 1) {
-		k->value = 1;
-		clock_gettime(CLOCK_MONOTONIC, &k->last_time_down);
-		return 0;
-	}
-
-	/* Key repeat.  which means key has been held for some time. */
-	if (value == 2) {
-		if ((n = try_send_2nd(fd, k, 1)) < 0)
-			return -1;
-		else
-			return 0;
-	}
-
-	/* Key release.  This is the complex situation. */
 
 	debug("Duration: %ld\n", duration_to_now(&k->last_time_down));
 
 	k->value = 0;
 	if ((n = try_send_2nd(fd, k, 0)) < 0)
 		return -1;
-
-	/* 2nd fun is sent on this release, done. */
 	if (n > 0)
 		return n;
 
 	/* The 2nd fun was not sent, send primary key unless timeout. */
-	if ((n = send_primary_on_short_stroke(fd, k)) < 0)
+
+	if (modkey_timeout(k))
+		return 0;
+	if ((n = send_primary_down_up(fd, k)) < 0)
 		return -1;
 
 	return n;
+}
+
+static int handle_complex_repeat(int fd, struct modkey *k)
+{
+	/* The repeating trigger time could be lower than delay timeout */
+	if (!modkey_timeout(k))
+		return 0;
+
+	if (try_send_2nd(fd, k, 1) < 0)
+		return -1;
+	else
+		return 1;
+}
+
+static int handle_complex(int fd, struct modkey *k, int value)
+{
+	switch (value) {
+	case 0:		return handle_complex_up(fd, k);
+	case 1:		return handle_complex_down(fd, k);
+	case 2:		return handle_complex_repeat(fd, k);
+	default:	return 0;
+	}
 }
 
 static int handle_normal(int fd, int code, int value)

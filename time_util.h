@@ -5,7 +5,7 @@
 
 int timespec_cmp(struct timespec *t1, struct timespec *t2);
 
-int timespec_cmp_now(struct timespec *t);
+int timespec_cmp_now_t(struct timespec *t);
 
 void timespec_add(struct timespec *t1, struct timespec *t2,
 		struct timespec *t);
