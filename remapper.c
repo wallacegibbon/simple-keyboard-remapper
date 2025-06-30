@@ -21,8 +21,9 @@ struct modkey {
 };
 
 struct modkey mod_map[] = {
-	{KEY_SPACE, 0, KEY_LEFTCTRL},
-	{KEY_CAPSLOCK, KEY_ESC},
+	{ KEY_SPACE, 0, KEY_LEFTCTRL },
+	{ KEY_CAPSLOCK, KEY_ESC },
+	{ KEY_ESC, KEY_GRAVE },
 };
 
 /*
@@ -62,8 +63,8 @@ static struct modkey *mod_map_find(long key)
 /* This function always return 1 on successful sent. */
 static int send_key(int fd, int key, int value)
 {
-	struct input_event e = {.type = EV_KEY, .code = key, .value = value};
-	struct input_event s = {.type = EV_SYN, .code = SYN_REPORT};
+	struct input_event e = { .type = EV_KEY, .code = key, .value = value };
+	struct input_event s = { .type = EV_SYN, .code = SYN_REPORT };
 
 	if (write(fd, &e, sizeof(e)) < 0)
 		return -1;
@@ -210,12 +211,12 @@ static int handle_ev(int fd, long code, int value)
 
 int main(int argc, const char **argv)
 {
-	struct uinput_user_dev uidev = {0};
-	struct input_event ev = {0};
+	struct uinput_user_dev uidev = { 0 };
+	struct input_event ev = { 0 };
 	int physical_fd, uinput_fd, i;
 
 #define LONGBITS (8 * sizeof(unsigned long))
-	unsigned long kbits[KEY_MAX / LONGBITS + 1] = {0};
+	unsigned long kbits[KEY_MAX / LONGBITS + 1] = { 0 };
 
 	if (argc < 2) {
 		log_error("Argument Error: Argument missing.\n");
