@@ -15,41 +15,34 @@
 #define COUNTOF(x) (sizeof(x) / sizeof(*(x)))
 
 struct modkey {
-	long key, primary_function, secondary_function;	/* key codes */
-	long value, last_value;				/* key values */
+	long key, map1, map2;			/* Original and mapped keys */
+	long value, last_value;			/* Key values */
 	struct timespec last_time_down;
 };
 
 struct modkey mod_map[] = {
-	{ KEY_SPACE, 0, KEY_LEFTCTRL },
-	{ KEY_CAPSLOCK, KEY_ESC },
-	{ KEY_ESC, KEY_GRAVE },
+	{ .key = KEY_SPACE,	.map1 = KEY_SPACE,	.map2 = KEY_LEFTCTRL },
+	{ .key = KEY_CAPSLOCK,	.map1 = KEY_ESC },
+	{ .key = KEY_ESC,	.map1 = KEY_GRAVE },
 };
 
 /*
  * If a key is held down for more than MAX_DELAY_MILLI_SEC,  it will not send
- * its primary function when released.
+ * its map1 function when released.
  */
 #define MAX_DELAY_MILLI_SEC	200
 
 /* Will be filled with `MAX_DELAY_MILLI_SEC'. */
 struct timespec delay_timespec;
 
-static inline int modkey_primary_or_key(struct modkey *self)
-{
-	return self->primary_function
-		? self->primary_function
-		: self->key;
-}
-
 static struct modkey *mod_map_find(long key)
 {
-	struct modkey *m = mod_map;
+	struct modkey *k = mod_map;
 	struct modkey *end = mod_map + COUNTOF(mod_map);
 
-	for (; m < end; ++m) {
-		if (m->key == key)
-			return m;
+	for (; k < end; ++k) {
+		if (k->key == key)
+			return k;
 	}
 
 	return NULL;
@@ -75,27 +68,27 @@ static int send_key(int fd, int key, int value)
 	return 1;
 }
 
-static int try_send_2nd(int fd, struct modkey *k, int value)
+static int try_send_map2(int fd, struct modkey *k, int value)
 {
 	if (k->last_value == value)
 		return 0;
 
-	if (send_key(fd, k->secondary_function, value) < 0)
+	if (send_key(fd, k->map2, value) < 0)
 		return -1;
 
 	k->last_value = value;
 	return 1;
 }
 
-static int active_modkeys_send_1_once(int fd)
+static int send_active_map2_once(int fd)
 {
-	struct modkey *m = mod_map;
+	struct modkey *k = mod_map;
 	struct modkey *end = mod_map + COUNTOF(mod_map);
 	int n = 0, t = 0;
 
-	for (; m < end; ++m, n += t) {
-		if (m->value == 1 && m->secondary_function > 0) {
-			if ((t = try_send_2nd(fd, m, 1)) < 0)
+	for (; k < end; ++k, n += t) {
+		if (k->value == 1 && k->map2 > 0) {
+			if ((t = try_send_map2(fd, k, 1)) < 0)
 				return -1;
 		}
 	}
@@ -118,14 +111,14 @@ static inline int modkey_timeout(struct modkey *k)
 	return timespec_cmp_now_t(&t) > 0;
 }
 
-static int send_primary_down_up(int fd, struct modkey *k)
+static int send_map1_down_up(int fd, struct modkey *k)
 {
 	int n = 0;
-	if ((n = active_modkeys_send_1_once(fd)) < 0)
+	if ((n = send_active_map2_once(fd)) < 0)
 		return -1;
-	if (send_key(fd, modkey_primary_or_key(k), 1) < 0)
+	if (send_key(fd, k->map1, 1) < 0)
 		return -2;
-	if (send_key(fd, modkey_primary_or_key(k), 0) < 0)
+	if (send_key(fd, k->map1, 0) < 0)
 		return -3;
 	return n + 2;
 }
@@ -144,16 +137,16 @@ static int handle_complex_up(int fd, struct modkey *k)
 	debug("Duration: %ld\n", duration_to_now(&k->last_time_down));
 
 	k->value = 0;
-	if ((n = try_send_2nd(fd, k, 0)) < 0)
+	if ((n = try_send_map2(fd, k, 0)) < 0)
 		return -1;
 	if (n > 0)
 		return n;
 
-	/* The 2nd fun was not sent, send primary key unless timeout. */
+	/* The map2 key was not sent, send map1 key unless timeout. */
 
 	if (modkey_timeout(k))
 		return 0;
-	if ((n = send_primary_down_up(fd, k)) < 0)
+	if ((n = send_map1_down_up(fd, k)) < 0)
 		return -1;
 
 	return n;
@@ -165,7 +158,7 @@ static int handle_complex_repeat(int fd, struct modkey *k)
 	if (!modkey_timeout(k))
 		return 0;
 
-	if (try_send_2nd(fd, k, 1) < 0)
+	if (try_send_map2(fd, k, 1) < 0)
 		return -1;
 	else
 		return 1;
@@ -187,7 +180,7 @@ static int handle_normal(int fd, int code, int value)
 
 	/* For simple keys, we send modkeys on press, not release. */
 	if (value == 1) {
-		if ((n = active_modkeys_send_1_once(fd)) < 0)
+		if ((n = send_active_map2_once(fd)) < 0)
 			return -1;
 	}
 
@@ -203,10 +196,15 @@ static int handle_ev(int fd, long code, int value)
 	if (k == NULL)
 		return handle_normal(fd, code, value);
 
-	if (k->secondary_function != 0)
+	if (k->map1 == 0) {
+		log_error("map1 of key \"%ld\" should not be 0\n", k->key);
+		return -1;
+	}
+
+	if (k->map2 != 0)
 		return handle_complex(fd, k, value);
 	else
-		return handle_normal(fd, modkey_primary_or_key(k), value);
+		return handle_normal(fd, k->map1, value);
 }
 
 int main(int argc, const char **argv)
