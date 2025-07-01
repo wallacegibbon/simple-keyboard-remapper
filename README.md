@@ -9,11 +9,16 @@ The code is ready to be ported to other systems.
 
 ## Installation
 
+If you only have one keyboard, the installation should be simple.
+
 To build, install, enable and start the service:
 
 ```shell
 make install
 ```
+
+If you have more than one keyboards, this program may not find the right
+device, then you need to change the systemd file to fix that.
 
 To stop, remove the service and uninstall the program:
 
