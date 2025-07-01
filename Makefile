@@ -2,18 +2,20 @@ TARGET = simple-keyboard-remapper
 INSTALL_PATH = /usr/bin
 SYSTEM_PATH = /etc/systemd/system
 
+OS_FILE = linux
+
 ifeq ($(DEBUG), 1)
 	C_FLAGS += -DDEBUG=1
 endif
 
 all: $(TARGET)
 
-$(TARGET): remapper.o time_util.o
+$(TARGET): remapper.o $(OS_FILE).o
 	gcc -o $@ $^
 
-remapper.o: remapper.c time_util.h
+remapper.o: remapper.c remapper.h keycode.h
 	gcc -c -o $@ $< $(C_FLAGS)
-time_util.o: time_util.c time_util.h
+$(OS_FILE).o: $(OS_FILE).c remapper.h
 	gcc -c -o $@ $< $(C_FLAGS)
 
 .PHONY: install uninstall clean showlog
