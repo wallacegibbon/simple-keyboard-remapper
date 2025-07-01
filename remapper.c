@@ -20,7 +20,7 @@ struct modkey {
 	struct timespec last_time_down;
 };
 
-struct modkey mod_map[] = {
+static struct modkey mod_map[] = {
 	{ .key = KEY_SPACE,	.map1 = KEY_SPACE,	.map2 = KEY_LEFTCTRL },
 	{ .key = KEY_CAPSLOCK,	.map1 = KEY_ESC },
 	{ .key = KEY_ESC,	.map1 = KEY_GRAVE },
@@ -33,7 +33,7 @@ struct modkey mod_map[] = {
 #define MAX_DELAY_MILLI_SEC	200
 
 /* Will be filled with `MAX_DELAY_MILLI_SEC'. */
-struct timespec delay_timespec;
+static struct timespec delay_timespec;
 
 static struct modkey *mod_map_find(long key)
 {
@@ -53,34 +53,37 @@ static struct modkey *mod_map_find(long key)
  * data sent, or negagive number on error.  (SYN is not calculated)
  */
 
+/* This variable will hold fd to uinput device after initialization */
+static int send_key_fd = 1;
+
 /* This function always return 1 on successful sent. */
-static int send_key(int fd, int key, int value)
+static int send_key(int key, int value)
 {
 	struct input_event e = { .type = EV_KEY, .code = key, .value = value };
 	struct input_event s = { .type = EV_SYN, .code = SYN_REPORT };
 
-	if (write(fd, &e, sizeof(e)) < 0)
+	if (write(send_key_fd, &e, sizeof(e)) < 0)
 		return -1;
-	if (write(fd, &s, sizeof(s)) < 0)
+	if (write(send_key_fd, &s, sizeof(s)) < 0)
 		return -2;
 
 	debug("Key: %d (value: %d)\n", key, value);
 	return 1;
 }
 
-static int try_send_map2(int fd, struct modkey *k, int value)
+static int try_send_map2(struct modkey *k, int value)
 {
 	if (k->last_value == value)
 		return 0;
 
-	if (send_key(fd, k->map2, value) < 0)
+	if (send_key(k->map2, value) < 0)
 		return -1;
 
 	k->last_value = value;
 	return 1;
 }
 
-static int send_active_map2_once(int fd)
+static int send_active_map2_once()
 {
 	struct modkey *k = mod_map;
 	struct modkey *end = mod_map + COUNTOF(mod_map);
@@ -88,7 +91,7 @@ static int send_active_map2_once(int fd)
 
 	for (; k < end; ++k, n += t) {
 		if (k->value == 1 && k->map2 > 0) {
-			if ((t = try_send_map2(fd, k, 1)) < 0)
+			if ((t = try_send_map2(k, 1)) < 0)
 				return -1;
 		}
 	}
@@ -111,33 +114,33 @@ static inline int modkey_timeout(struct modkey *k)
 	return timespec_cmp_now_t(&t) > 0;
 }
 
-static int send_map1_down_up(int fd, struct modkey *k)
+static int send_map1_down_up(struct modkey *k)
 {
 	int n = 0;
-	if ((n = send_active_map2_once(fd)) < 0)
+	if ((n = send_active_map2_once()) < 0)
 		return -1;
-	if (send_key(fd, k->map1, 1) < 0)
+	if (send_key(k->map1, 1) < 0)
 		return -2;
-	if (send_key(fd, k->map1, 0) < 0)
+	if (send_key(k->map1, 0) < 0)
 		return -3;
 	return n + 2;
 }
 
-static int handle_complex_down(int fd, struct modkey *k)
+static int handle_complex_down(struct modkey *k)
 {
 	k->value = 1;
 	clock_gettime(CLOCK_MONOTONIC, &k->last_time_down);
 	return 0;
 }
 
-static int handle_complex_up(int fd, struct modkey *k)
+static int handle_complex_up(struct modkey *k)
 {
 	int n = 0;
 
 	debug("Duration: %ld\n", duration_to_now(&k->last_time_down));
 
 	k->value = 0;
-	if ((n = try_send_map2(fd, k, 0)) < 0)
+	if ((n = try_send_map2(k, 0)) < 0)
 		return -1;
 	if (n > 0)
 		return n;
@@ -146,55 +149,55 @@ static int handle_complex_up(int fd, struct modkey *k)
 
 	if (modkey_timeout(k))
 		return 0;
-	if ((n = send_map1_down_up(fd, k)) < 0)
+	if ((n = send_map1_down_up(k)) < 0)
 		return -1;
 
 	return n;
 }
 
-static int handle_complex_repeat(int fd, struct modkey *k)
+static int handle_complex_repeat(struct modkey *k)
 {
 	/* The repeating trigger time could be lower than delay timeout */
 	if (!modkey_timeout(k))
 		return 0;
 
-	if (try_send_map2(fd, k, 1) < 0)
+	if (try_send_map2(k, 1) < 0)
 		return -1;
 	else
 		return 1;
 }
 
-static int handle_complex(int fd, struct modkey *k, int value)
+static int handle_complex(struct modkey *k, int value)
 {
 	switch (value) {
-	case 0:		return handle_complex_up(fd, k);
-	case 1:		return handle_complex_down(fd, k);
-	case 2:		return handle_complex_repeat(fd, k);
+	case 0:		return handle_complex_up(k);
+	case 1:		return handle_complex_down(k);
+	case 2:		return handle_complex_repeat(k);
 	default:	return 0;
 	}
 }
 
-static int handle_normal(int fd, int code, int value)
+static int handle_normal(int code, int value)
 {
 	int n = 0;
 
 	/* For simple keys, we send modkeys on press, not release. */
 	if (value == 1) {
-		if ((n = send_active_map2_once(fd)) < 0)
+		if ((n = send_active_map2_once()) < 0)
 			return -1;
 	}
 
-	if (send_key(fd, code, value) < 0)
+	if (send_key(code, value) < 0)
 		return -2;
 
 	return n + 1;
 }
 
-static int handle_ev(int fd, long code, int value)
+static int handle_ev(long code, int value)
 {
 	struct modkey *k = mod_map_find(code);
 	if (k == NULL)
-		return handle_normal(fd, code, value);
+		return handle_normal(code, value);
 
 	if (k->map1 == 0) {
 		log_error("map1 of key \"%ld\" should not be 0\n", k->key);
@@ -202,9 +205,9 @@ static int handle_ev(int fd, long code, int value)
 	}
 
 	if (k->map2 != 0)
-		return handle_complex(fd, k, value);
+		return handle_complex(k, value);
 	else
-		return handle_normal(fd, k->map1, value);
+		return handle_normal(k->map1, value);
 }
 
 int main(int argc, const char **argv)
@@ -279,9 +282,11 @@ int main(int argc, const char **argv)
 
 	ms_to_timespec(MAX_DELAY_MILLI_SEC, &delay_timespec);
 
+	send_key_fd = uinput_fd;
+
 	while (read(physical_fd, &ev, sizeof(ev)) > 0) {
 		if (ev.type == EV_KEY) {
-			if (handle_ev(uinput_fd, ev.code, ev.value) < 0)
+			if (handle_ev(ev.code, ev.value) < 0)
 				goto err4;
 		}
 	}
