@@ -10,9 +10,9 @@ struct modkey {
 };
 
 static struct modkey mod_map[] = {
-	{ .key = KEY_SPACE,	.map1 = KEY_SPACE,	.map2 = KEY_LEFTCTRL },
-	{ .key = KEY_CAPSLOCK,	.map1 = KEY_ESC },
-	{ .key = KEY_ESC,	.map1 = KEY_GRAVE },
+	{ KEY_SPACE, KEY_SPACE, KEY_LEFTCTRL },
+	{ KEY_CAPSLOCK, KEY_ESC },
+	{ KEY_ESC, KEY_GRAVE },
 };
 
 static struct modkey *mod_map_find(long key)

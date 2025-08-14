@@ -9,12 +9,18 @@ static int physical_fd, uinput_fd;
 
 int send_key(int key, int value)
 {
-	struct input_event e = { .type = EV_KEY, .code = key, .value = value };
-	struct input_event s = { .type = EV_SYN, .code = SYN_REPORT };
+	struct input_event keyev = { 0 }, synev = { 0 };
 
-	if (write(uinput_fd, &e, sizeof(e)) < 0)
+	keyev.type = EV_KEY;
+	keyev.code = key;
+	keyev.value = value;
+
+	synev.type = EV_SYN;
+	synev.code = SYN_REPORT;
+
+	if (write(uinput_fd, &keyev, sizeof(keyev)) < 0)
 		return -1;
-	if (write(uinput_fd, &s, sizeof(s)) < 0)
+	if (write(uinput_fd, &synev, sizeof(synev)) < 0)
 		return -2;
 
 	debug("Key: %d (value: %d)\n", key, value);
