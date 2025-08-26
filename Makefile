@@ -13,14 +13,14 @@ all: $(PROGRAM)
 
 $(PROGRAM): remapper.o $(OS_FILE).o
 	@echo "	LINK	$@"
-	@gcc -o $@ $^
+	@$(CC) -o $@ $^
 
 remapper.o: remapper.c remapper.h keycode.h
 	@echo "	CC	$@"
-	@gcc -c -o $@ $< $(C_FLAGS)
+	@$(CC) -c -o $@ $< $(C_FLAGS)
 $(OS_FILE).o: $(OS_FILE).c remapper.h
 	@echo "	CC	$@"
-	@gcc -c -o $@ $< $(C_FLAGS)
+	@$(CC) -c -o $@ $< $(C_FLAGS)
 
 .PHONY: install uninstall clean showlog
 
