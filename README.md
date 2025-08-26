@@ -1,8 +1,8 @@
 # Simple Keyboard Remapper
 
-On Linux, this program creates a new virtual keyboard device with `uinput`.
-It grabs input from the physical keyboard and pipe events to that virtual
-device.
+On Linux, this program creates a new virtual keyboard device with
+[uinput][uinput].  It grabs input from the physical keyboard and pipe events
+to that virtual device.
 
 The code is ready to be ported to other systems.
 
@@ -54,6 +54,9 @@ cat /proc/bus/input/devices | grep -i keyboard -B1 -A4
 
 ## History
 
-This project was modified from [Janus Key](https://github.com/pietroiusti/janus-key).
+This project was modified from [Janus Key][janus-key].
 
 The `libevdev` dependency is removed, we use `uinput` directly.
+
+[uinput]: https://www.kernel.org/doc/html/v4.12/input/uinput.html
+[janus-key]: https://github.com/pietroiusti/janus-key
