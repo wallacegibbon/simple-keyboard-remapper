@@ -1,12 +1,10 @@
 TARGET = simple-keyboard-remapper
 INSTALL_PATH = /usr/bin
 SYSTEM_PATH = /etc/systemd/system
-
 OS_FILE = linux
 
-ifeq ($(DEBUG), 1)
-	C_FLAGS += -DDEBUG=1
-endif
+#C_FLAGS = -DDEBUG=1
+C_FLAGS =
 
 all: $(TARGET)
 
