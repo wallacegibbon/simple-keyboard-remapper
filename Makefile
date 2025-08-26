@@ -1,39 +1,47 @@
-TARGET = simple-keyboard-remapper
-INSTALL_PATH = /usr/bin
+PROGRAM = simple-keyboard-remapper
+BIN_PATH = /usr/bin
 SYSTEM_PATH = /etc/systemd/system
-OS_FILE = linux
+CC = cc
+STRIP = strip --remove-section=.eh_frame --remove-section=.eh_frame_hdr
 
 #C_FLAGS = -DDEBUG=1
 C_FLAGS =
 
-all: $(TARGET)
+OS_FILE = linux
 
-$(TARGET): remapper.o $(OS_FILE).o
-	gcc -o $@ $^
+all: $(PROGRAM)
+
+$(PROGRAM): remapper.o $(OS_FILE).o
+	@echo "	LINK	$@"
+	@gcc -o $@ $^
 
 remapper.o: remapper.c remapper.h keycode.h
-	gcc -c -o $@ $< $(C_FLAGS)
+	@echo "	CC	$@"
+	@gcc -c -o $@ $< $(C_FLAGS)
 $(OS_FILE).o: $(OS_FILE).c remapper.h
-	gcc -c -o $@ $< $(C_FLAGS)
+	@echo "	CC	$@"
+	@gcc -c -o $@ $< $(C_FLAGS)
 
 .PHONY: install uninstall clean showlog
 
-install: $(TARGET)
-	cp $< $(INSTALL_PATH)/
-	cp $(TARGET).service $(SYSTEM_PATH)/
-	./fix_device.sh $(SYSTEM_PATH)/$(TARGET).service
-	systemctl daemon-reload
-	systemctl enable $(TARGET).service
-	systemctl start $(TARGET).service
+install: $(PROGRAM)
+	@cp $(PROGRAM) $(BIN_PATH)
+	@$(STRIP) $(BIN_PATH)/$(PROGRAM)
+	@chmod 755 $(BIN_PATH)/$(PROGRAM)
+	@cp $(PROGRAM).service $(SYSTEM_PATH)/
+	@./fix_device.sh $(SYSTEM_PATH)/$(PROGRAM).service
+	@systemctl daemon-reload
+	@systemctl enable $(PROGRAM).service
+	@systemctl start $(PROGRAM).service
 
 uninstall:
-	systemctl stop $(TARGET).service
-	rm $(SYSTEM_PATH)/$(TARGET).service
-	rm $(INSTALL_PATH)/$(TARGET)
-	systemctl daemon-reload
+	@systemctl stop $(PROGRAM).service
+	@rm $(SYSTEM_PATH)/$(PROGRAM).service
+	@rm $(BIN_PATH)/$(PROGRAM)
+	@systemctl daemon-reload
 
 clean:
-	rm -f $(TARGET) *.o
+	@rm -f $(PROGRAM) *.o
 
 showlog:
-	journalctl -u $(TARGET) -f
+	@journalctl -u $(PROGRAM) -f
