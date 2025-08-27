@@ -4,8 +4,8 @@ SYSTEM_PATH = /etc/systemd/system
 CC = cc
 STRIP = strip --remove-section=.eh_frame --remove-section=.eh_frame_hdr
 
-#C_FLAGS = -DDEBUG=1
-C_FLAGS =
+#CFLAGS = -O2 -DDEBUG=1
+CFLAGS = -O2
 
 OS_FILE = linux
 
@@ -17,10 +17,10 @@ $(PROGRAM): remapper.o $(OS_FILE).o
 
 remapper.o: remapper.c remapper.h keycode.h
 	@echo "	CC	$@"
-	@$(CC) -c -o $@ $< $(C_FLAGS)
+	@$(CC) -c -o $@ $< $(CFLAGS)
 $(OS_FILE).o: $(OS_FILE).c remapper.h
 	@echo "	CC	$@"
-	@$(CC) -c -o $@ $< $(C_FLAGS)
+	@$(CC) -c -o $@ $< $(CFLAGS)
 
 .PHONY: install uninstall clean showlog
 
