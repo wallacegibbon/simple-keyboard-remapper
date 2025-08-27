@@ -15,14 +15,8 @@ $(PROGRAM): remapper.o $(OS_FILE).o
 	@echo "	LINK	$@"
 	@$(CC) -o $@ $^
 
-remapper.o: remapper.c remapper.h keycode.h
-	@echo "	CC	$@"
-	@$(CC) -c -o $@ $< $(CFLAGS)
-$(OS_FILE).o: $(OS_FILE).c remapper.h
-	@echo "	CC	$@"
-	@$(CC) -c -o $@ $< $(CFLAGS)
-
-.PHONY: install uninstall clean showlog
+clean:
+	@rm -f $(PROGRAM) *.o
 
 install: $(PROGRAM)
 	@cp $(PROGRAM) $(BIN_PATH)
@@ -40,8 +34,12 @@ uninstall:
 	@rm $(BIN_PATH)/$(PROGRAM)
 	@systemctl daemon-reload
 
-clean:
-	@rm -f $(PROGRAM) *.o
-
 showlog:
 	@journalctl -u $(PROGRAM) -f
+
+.c.o:
+	@echo "	CC	$@"
+	@$(CC) $(CFLAGS) -c $*.c
+
+remapper.o: remapper.c remapper.h keycode.h
+linux.o: linux.c remapper.h
