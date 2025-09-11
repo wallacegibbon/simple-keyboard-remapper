@@ -3,22 +3,24 @@
 
 #define COUNTOF(x) (sizeof(x) / sizeof(*(x)))
 
-struct modkey {
+typedef struct ModKey ModKey;
+
+struct ModKey {
 	long key, map1, map2;			/* Original and mapped keys */
 	long value, last_value;			/* Key values */
 	tsms_t last_down_time;
 };
 
-static struct modkey mod_map[] = {
+static ModKey mod_map[] = {
 	{ KEY_SPACE, KEY_SPACE, KEY_LEFTCTRL },
 	{ KEY_CAPSLOCK, KEY_ESC },
 	{ KEY_ESC, KEY_GRAVE },
 };
 
-static struct modkey *mod_map_find(long key)
+static ModKey *mod_map_find(long key)
 {
-	struct modkey *k = mod_map;
-	struct modkey *end = mod_map + COUNTOF(mod_map);
+	ModKey *k = mod_map;
+	ModKey *end = mod_map + COUNTOF(mod_map);
 
 	for (; k < end; ++k) {
 		if (k->key == key)
@@ -28,7 +30,7 @@ static struct modkey *mod_map_find(long key)
 	return NULL;
 };
 
-static int try_send_map2(struct modkey *k, int value)
+static int try_send_map2(ModKey *k, int value)
 {
 	if (k->last_value == value)
 		return 0;
@@ -41,8 +43,7 @@ static int try_send_map2(struct modkey *k, int value)
 
 static int send_active_map2_once()
 {
-	struct modkey *k = mod_map;
-	struct modkey *end = mod_map + COUNTOF(mod_map);
+	ModKey *k = mod_map, *end = mod_map + COUNTOF(mod_map);
 	int n = 0, t = 0;
 
 	for (; k < end; ++k, n += t) {
@@ -55,12 +56,12 @@ static int send_active_map2_once()
 	return n;
 }
 
-static inline int modkey_timeout(struct modkey *k)
+static inline int modkey_timeout(ModKey *k)
 {
 	return k->last_down_time + MAX_DELAY_MS < current_time();
 }
 
-static int send_map1_down_up(struct modkey *k)
+static int send_map1_down_up(ModKey *k)
 {
 	int n = 0;
 	if ((n = send_active_map2_once()) < 0)
@@ -73,14 +74,14 @@ static int send_map1_down_up(struct modkey *k)
 	return n + 2;
 }
 
-static int handle_complex_down(struct modkey *k)
+static int handle_complex_down(ModKey *k)
 {
 	k->value = 1;
 	k->last_down_time = current_time();
 	return 0;
 }
 
-static int handle_complex_up(struct modkey *k)
+static int handle_complex_up(ModKey *k)
 {
 	int n = 0;
 	debug("Duration: %ld\n", current_time() - k->last_down_time);
@@ -100,7 +101,7 @@ static int handle_complex_up(struct modkey *k)
 	return n;
 }
 
-static int handle_complex_repeat(struct modkey *k)
+static int handle_complex_repeat(ModKey *k)
 {
 	/* The repeating trigger time could be lower than delay timeout */
 	if (!modkey_timeout(k))
@@ -112,7 +113,7 @@ static int handle_complex_repeat(struct modkey *k)
 		return 1;
 }
 
-static int handle_complex(struct modkey *k, int value)
+static int handle_complex(ModKey *k, int value)
 {
 	switch (value) {
 	case 0:		return handle_complex_up(k);
@@ -138,13 +139,15 @@ static int handle_normal(int keycode, int keyvalue)
 
 static int handle_ev(long keycode, int keyvalue)
 {
-	struct modkey *k = mod_map_find(keycode);
+	ModKey *k = mod_map_find(keycode);
 	if (k == NULL)
 		return handle_normal(keycode, keyvalue);
+
 	if (k->map1 == 0) {
 		log_error("map1 of key \"%ld\" should not be 0\n", k->key);
 		return -1;
 	}
+
 	if (k->map2 != 0)
 		return handle_complex(k, keyvalue);
 	else
