@@ -7,7 +7,8 @@
 /* This variable will hold fd to uinput device after initialization */
 static int physical_fd, uinput_fd;
 
-int send_key(int key, int value)
+int
+send_key(int key, int value)
 {
 	struct input_event keyev = { 0 }, synev = { 0 };
 
@@ -27,14 +28,16 @@ int send_key(int key, int value)
 	return 1;
 }
 
-tsms_t current_time()
+tsms_t
+current_time()
 {
 	struct timespec t;
 	clock_gettime(CLOCK_MONOTONIC, &t);
 	return t.tv_sec * 1000 + t.tv_nsec / 1000000;
 }
 
-int event_loop(long *keycode, long *keyvalue)
+int
+event_loop(long *keycode, long *keyvalue)
 {
 	struct input_event ev = { 0 };
 	for (;;) {
@@ -48,7 +51,8 @@ int event_loop(long *keycode, long *keyvalue)
 	return 0;
 }
 
-int init(const char *initarg)
+int
+init(const char *initarg)
 {
 	struct uinput_user_dev uidev = { 0 };
 	int i;
