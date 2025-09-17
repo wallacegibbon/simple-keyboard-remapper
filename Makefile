@@ -9,33 +9,33 @@ CFLAGS = -O2
 
 OBJS = remapper.o linux.o
 
-$(PROGRAM): $(OBJS)
-	$(CC) -o $@ $(OBJS)
+${PROGRAM}: ${OBJS}
+	${CC} -o $@ ${OBJS}
 
 .c.o:
-	$(CC) $(CFLAGS) -c $<
+	${CC} ${CFLAGS} -c $<
 
 clean:
-	rm -f $(PROGRAM) *.o
+	rm -f ${PROGRAM} *.o
 
-install: $(PROGRAM)
-	cp $(PROGRAM) $(BIN)
-	$(STRIP) $(BIN)/$(PROGRAM)
-	chmod 755 $(BIN)/$(PROGRAM)
-	cp $(PROGRAM).service $(SYSTEM)/
-	./fix_device.sh $(SYSTEM)/$(PROGRAM).service
+install: ${PROGRAM}
+	cp ${PROGRAM} ${BIN}
+	${STRIP} ${BIN}/${PROGRAM}
+	chmod 755 ${BIN}/${PROGRAM}
+	cp ${PROGRAM}.service ${SYSTEM}/
+	./fix_device.sh ${SYSTEM}/${PROGRAM}.service
 	systemctl daemon-reload
-	systemctl enable $(PROGRAM).service
-	systemctl start $(PROGRAM).service
+	systemctl enable ${PROGRAM}.service
+	systemctl start ${PROGRAM}.service
 
 uninstall:
-	systemctl stop $(PROGRAM).service
-	rm $(SYSTEM)/$(PROGRAM).service
-	rm $(BIN)/$(PROGRAM)
+	systemctl stop ${PROGRAM}.service
+	rm ${SYSTEM}/${PROGRAM}.service
+	rm ${BIN}/${PROGRAM}
 	systemctl daemon-reload
 
 showlog:
-	journalctl -u $(PROGRAM) -f
+	journalctl -u ${PROGRAM} -f
 
 remapper.o: remapper.c remapper.h keycode.h
 linux.o: linux.c remapper.h

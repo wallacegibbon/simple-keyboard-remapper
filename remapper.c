@@ -6,8 +6,8 @@
 typedef struct ModKey ModKey;
 
 struct ModKey {
-	long key, map1, map2;			/* Original and mapped keys */
-	long value, last_value;			/* Key values */
+	long key, map1, map2;	/* Original and mapped keys */
+	long value, last_value;	/* Key values */
 	tsms_t last_down_time;
 };
 
@@ -125,10 +125,10 @@ static int
 handle_complex(ModKey *k, int value)
 {
 	switch (value) {
-	case 0:		return handle_complex_up(k);
-	case 1:		return handle_complex_down(k);
-	case 2:		return handle_complex_repeat(k);
-	default:	return 0;
+	case 0: return handle_complex_up(k);
+	case 1: return handle_complex_down(k);
+	case 2: return handle_complex_repeat(k);
+	default: return 0;
 	}
 }
 
