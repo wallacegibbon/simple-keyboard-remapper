@@ -1,5 +1,5 @@
 #include "remapper.h"
-#include "keycode.h"
+#include <linux/input-event-codes.h>
 
 #define COUNTOF(x) (sizeof(x) / sizeof(*(x)))
 
@@ -12,9 +12,16 @@ struct ModKey {
 };
 
 static ModKey mod_map[] = {
+#ifdef GRAVE_IS_ESC
+	{ KEY_ESC, KEY_GRAVE },
+#endif
+#ifdef EMACS_USER
 	{ KEY_SPACE, KEY_SPACE, KEY_LEFTCTRL },
 	{ KEY_CAPSLOCK, KEY_ESC },
-	{ KEY_ESC, KEY_GRAVE },
+#else
+	{ KEY_TAB, KEY_ESC },
+	{ KEY_CAPSLOCK, KEY_LEFTCTRL },
+#endif
 };
 
 static ModKey*
