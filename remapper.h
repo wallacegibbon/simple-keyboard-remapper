@@ -6,10 +6,10 @@ typedef unsigned long tsms_t;	/* timestamp in milliseconds */
 #define MAX_DELAY_MS	200	/* Boundary time for map1 function */
 
 /* OS specific functions */
-tsms_t	current_time();
-int	event_loop(long *keycode, long *keyvalue);
-int	send_key(int key, int value);
-int	init(const char *initarg);
+tsms_t current_time();
+int event_loop(long *keycode, long *keyvalue);
+int send_key(int key, int value);
+int init(const char *initarg);
 
 /* Log utilities */
 #include <stdio.h>

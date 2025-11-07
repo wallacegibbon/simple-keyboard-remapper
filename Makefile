@@ -4,8 +4,8 @@ SYSTEM = /etc/systemd/system
 CC = cc
 STRIP = strip --remove-section=.eh_frame --remove-section=.eh_frame_hdr
 
-#CFLAGS = -O2 -DGRAVE_IS_ESC -DEMACS_USER #-DDEBUG=1
-CFLAGS = -O2 -DGRAVE_IS_ESC
+CFLAGS = -O2 -DGRAVE_IS_ESC -DEMACS_USER #-DDEBUG=1
+#CFLAGS = -O2 -DGRAVE_IS_ESC
 #CFLAGS = -O2
 
 OBJS = remapper.o linux.o
