@@ -17,8 +17,8 @@ static struct modkey mod_map[] = {
 	{ KEY_SPACE, KEY_SPACE, KEY_LEFTCTRL },
 	{ KEY_CAPSLOCK, KEY_ESC },
 #else
-	{ KEY_TAB, KEY_ESC },
 	{ KEY_CAPSLOCK, KEY_LEFTCTRL },
+	{ KEY_LEFTCTRL, KEY_CAPSLOCK },
 #endif
 };
 
