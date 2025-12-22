@@ -16,7 +16,7 @@ static struct modkey mod_map[] = {
 #ifdef EMACS_USER
 	{ KEY_SPACE, KEY_SPACE, KEY_LEFTCTRL },
 	{ KEY_CAPSLOCK, KEY_ESC },
-#else
+#elif SWAP_CAPS_CTRL
 	{ KEY_CAPSLOCK, KEY_LEFTCTRL },
 	{ KEY_LEFTCTRL, KEY_CAPSLOCK },
 #endif
