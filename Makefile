@@ -5,8 +5,7 @@ CC = cc
 STRIP = strip --remove-section=.eh_frame --remove-section=.eh_frame_hdr
 
 #CFLAGS = -O2 -DGRAVE_IS_ESC -DEMACS_USER #-DDEBUG=1
-CFLAGS = -O2 -DGRAVE_IS_ESC
-#CFLAGS = -O2
+CFLAGS = -O2 -DSWAP_CAPS_CTRL
 
 OBJS = remapper.o linux.o
 
