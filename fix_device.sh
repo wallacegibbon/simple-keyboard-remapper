@@ -11,11 +11,10 @@ event0)
 	;;
 event*)
 	echo "Replacing event0 with $first_kbd ..."
+	sed -i "s/event0/$first_kbd/" $1
 	;;
 *)
 	echo "Keyboard event file not found" >&2
 	exit 1
 	;;
 esac
-
-sed -i "s/event0/$first_kbd/" $1
