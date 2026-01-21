@@ -2,6 +2,7 @@
 #include <linux/uinput.h>
 #include <fcntl.h>
 #include <unistd.h>
+#include <limits.h>
 #include <time.h>
 
 /* This variable will hold fd to uinput device after initialization */
@@ -49,7 +50,7 @@ int init(const char *initarg) {
 	struct uinput_user_dev uidev = { 0 };
 	int i;
 
-#define LONGBITS (8 * sizeof(unsigned long))
+#define LONGBITS (CHAR_BIT * sizeof(unsigned long))
 	unsigned long kbits[KEY_MAX / LONGBITS + 1] = { 0 };
 
 	/* !! Sleep 100ms on startup, or the program behave weird !! */
