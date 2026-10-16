@@ -1,11 +1,18 @@
 [Unit]
 Description=Simple Keyboard Remapper
 After=syslog.target
+# Keep retrying forever: if the keyboard goes away (unplug / USB reset /
+# re-enumeration) we want the service to pick it up again once it comes back,
+# instead of tripping the "start request repeated too quickly" limiter.
+StartLimitIntervalSec=0
 
 [Service]
 Type=simple
+# The device path is filled in by fix_device.sh at install time.  It prefers
+# the stable /dev/input/by-id/...-event-kbd symlink over a volatile eventN.
 ExecStart=/usr/bin/simple-keyboard-remapper /dev/input/event0
 Restart=always
+RestartSec=1
 
 [Install]
 WantedBy=multi-user.target
